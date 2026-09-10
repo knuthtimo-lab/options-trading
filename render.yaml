@@ -1,0 +1,7 @@
+﻿services:
+  - type: web
+    name: options-trading-scanner
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn src.web.app:app --host 0.0.0.0 --port $PORT
+    plan: free
