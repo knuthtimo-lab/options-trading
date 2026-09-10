@@ -152,6 +152,8 @@
               </button>
             </div>
             <input type="text" id="filter-symbols" value="SPY,QQQ,AAPL,NVDA,TSLA,AMD,META,MSFT" 
+                   oninput="try{localStorage.setItem('saved_filter-symbols', this.value.trim().toUpperCase())}catch(e){}"
+                   onkeydown="if(event.key === 'Enter') fetchSignals(true)"
                    class="w-full bg-darkbg border border-cardborder rounded-xl px-3.5 py-2 text-xs text-white font-mono focus:outline-none focus:border-sky-500 transition shadow-inner">
           </div>
           <div>
@@ -295,6 +297,7 @@
               <i data-lucide="search" class="w-4 h-4 text-slate-400"></i>
               <input type="text" id="curated-symbols-input" value="SPY,QQQ,AAPL,NVDA,TSLA,AMD,META,MSFT,PLTR" 
                      placeholder="Tickers..." 
+                     oninput="try{localStorage.setItem('saved_curated-symbols-input', this.value.trim().toUpperCase())}catch(e){}"
                      onkeydown="if(event.key === 'Enter') loadCuratedSetups()"
                      class="w-48 sm:w-64 bg-transparent text-xs text-white font-mono uppercase focus:outline-none placeholder-slate-600">
               <button onclick="rollRandomTickers('curated-symbols-input', loadCuratedSetups)" title="8 Zufalls-Ticker aus 70+ US-Pool für Curated Setups würfeln" class="bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-300 border border-amber-500/40 px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1">
@@ -373,6 +376,7 @@
               <i data-lucide="search" class="w-4 h-4 text-slate-400"></i>
               <input type="text" id="asymmetric-symbols-input" value="SPY,QQQ,AAPL,NVDA,TSLA,AMD,META,MSFT" 
                      placeholder="Tickers..." 
+                     oninput="try{localStorage.setItem('saved_asymmetric-symbols-input', this.value.trim().toUpperCase())}catch(e){}"
                      onkeydown="if(event.key === 'Enter') loadAsymmetricSetups()"
                      class="w-48 sm:w-64 bg-transparent text-xs text-white font-mono uppercase focus:outline-none placeholder-slate-600">
               <button onclick="rollRandomTickers('asymmetric-symbols-input', loadAsymmetricSetups)" title="8 Zufalls-Ticker für Asymmetrische Setups würfeln" class="bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 text-emerald-300 border border-emerald-500/40 px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1">
@@ -1457,40 +1461,6 @@
       }
     }
 
-    function setScannerPreset(preset) {
-      const confSelect = document.getElementById('filter-conf');
-      const popSelect = document.getElementById('filter-pop');
-      const ivrSelect = document.getElementById('filter-ivr');
-      const actionSelect = document.getElementById('filter-action');
-
-      if (preset === 'all') {
-        confSelect.value = "0";
-        popSelect.value = "0";
-        ivrSelect.value = "0";
-        actionSelect.value = "ALL";
-      } else if (preset === 'high_pop') {
-        popSelect.value = "75";
-        confSelect.value = "0";
-      } else if (preset === 'top_conf') {
-        confSelect.value = "80";
-        popSelect.value = "0";
-      } else if (preset === 'credit') {
-        actionSelect.value = "SELL";
-        confSelect.value = "0";
-        popSelect.value = "0";
-      } else if (preset === 'high_iv') {
-        ivrSelect.value = "35";
-        confSelect.value = "0";
-        popSelect.value = "0";
-      }
-      fetchSignals(true);
-    }
-
-    function setScannerUniverse(symbols) {
-      document.getElementById('filter-symbols').value = symbols;
-      fetchSignals(true);
-    }
-
     async function loadCuratedSetups() {
       const container = document.getElementById('curated-cards-grid');
       const badge = document.getElementById('curated-count-badge');
@@ -2041,6 +2011,7 @@
       const input = document.getElementById('filter-symbols');
       if (input) {
         input.value = symbols;
+        try { localStorage.setItem('saved_filter-symbols', symbols); } catch(e) {}
         showDiscoveryToast(`Universum gewählt: ${symbols}`);
         if (autoScan) {
           fetchSignals(true);
@@ -2081,6 +2052,7 @@
         if (res.ok) {
           const data = await res.json();
           input.value = data.symbols_string;
+          try { localStorage.setItem('saved_' + targetInputId, data.symbols_string); } catch(e) {}
           showDiscoveryToast(`🎲 8 Zufalls-Ticker ausgewählt: ${data.symbols_string}`);
           if (scanCallback) scanCallback(true);
           return;
@@ -2094,6 +2066,7 @@
       const shuffled = [...pool].sort(() => 0.5 - Math.random());
       const selected = shuffled.slice(0, 8);
       input.value = selected.join(',');
+      try { localStorage.setItem('saved_' + targetInputId, input.value); } catch(e) {}
       showDiscoveryToast(`🎲 8 Zufalls-Ticker ausgewählt: ${input.value}`);
       if (scanCallback) scanCallback(true);
     }
@@ -2117,7 +2090,18 @@
     }
 
     async function fetchSignals(showFullLoader = false) {
-      const symbols = document.getElementById('filter-symbols').value || 'SPY,QQQ,AAPL,NVDA,TSLA';
+      let symbolsInput = document.getElementById('filter-symbols');
+      let symbols = symbolsInput ? symbolsInput.value.trim() : '';
+      if (!symbols) {
+        try {
+          symbols = localStorage.getItem('saved_filter-symbols') || 'SPY,QQQ,AAPL,NVDA,TSLA,AMD,META,MSFT';
+          if (symbolsInput) symbolsInput.value = symbols;
+        } catch(e) {
+          symbols = 'SPY,QQQ,AAPL,NVDA,TSLA,AMD,META,MSFT';
+        }
+      } else {
+        try { localStorage.setItem('saved_filter-symbols', symbols); } catch(e) {}
+      }
       const action = document.getElementById('filter-action').value;
       const minConf = document.getElementById('filter-conf').value;
       const minPop = document.getElementById('filter-pop').value;
@@ -3653,6 +3637,28 @@
 
     document.addEventListener('DOMContentLoaded', () => {
       lucide.createIcons();
+      
+      // Restore saved universe / random tickers from localStorage if available
+      try {
+        const savedScanner = localStorage.getItem('saved_filter-symbols');
+        if (savedScanner) {
+          const filterInput = document.getElementById('filter-symbols');
+          if (filterInput) filterInput.value = savedScanner;
+        }
+        const savedCurated = localStorage.getItem('saved_curated-symbols-input');
+        if (savedCurated) {
+          const curatedInput = document.getElementById('curated-symbols-input');
+          if (curatedInput) curatedInput.value = savedCurated;
+        }
+        const savedAsymmetric = localStorage.getItem('saved_asymmetric-symbols-input');
+        if (savedAsymmetric) {
+          const asymInput = document.getElementById('asymmetric-symbols-input');
+          if (asymInput) asymInput.value = savedAsymmetric;
+        }
+      } catch(e) {
+        console.warn('localStorage restore failed', e);
+      }
+
       updateMacro();
       fetchSignals(true);
       checkAiConfig();
