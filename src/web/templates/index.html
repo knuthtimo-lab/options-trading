@@ -622,6 +622,76 @@
           </div>
         </div>
 
+        <!-- QUANT-EMPFEHLUNG: OBJEKTIV BESTE STRATEGIE FÜR DEN TICKER -->
+        <div id="chain-optimal-strategy-card" class="bg-gradient-to-r from-cardbg via-surface to-cardbg rounded-2xl border border-sky-500/30 p-4 shadow-xl transition relative overflow-hidden">
+          <div class="absolute -right-10 -top-10 w-48 h-48 bg-sky-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+          <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+            <!-- Left Info Block -->
+            <div class="space-y-2 flex-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-[10px] font-mono font-bold uppercase tracking-wider bg-sky-500/15 text-sky-300 border border-sky-500/30 px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-sm">
+                  <i data-lucide="award" class="w-3.5 h-3.5 text-sky-400"></i>
+                  <span>QUANT-OPTIMIERTE STRATEGIE-EMPFEHLUNG</span>
+                </span>
+                <span id="chain-opt-confidence" class="text-[10px] font-mono font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-700/60 px-2.5 py-1 rounded-full">
+                  Suitability: 96% (Grade A+)
+                </span>
+                <span id="chain-opt-action-type" class="text-[10px] font-mono font-semibold uppercase bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700">
+                  SELL_PREMIUM
+                </span>
+              </div>
+
+              <div>
+                <h3 id="chain-opt-strategy-name" class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                  <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i>
+                  <span id="chain-opt-title-text">Lade optimale Strategie...</span>
+                </h3>
+                <p id="chain-opt-primary-rationale" class="text-xs text-slate-300 mt-1 leading-relaxed max-w-4xl">
+                  Die quantitativ beste Strategie wird anhand von IV Rank, Dealer Greeks, Trend und Volumen-Flow ermittelt.
+                </p>
+              </div>
+
+              <!-- Warum diese Strategie andere schlaegt Box -->
+              <div class="bg-darkbg/90 border border-cardborder rounded-xl p-3 text-xs space-y-1">
+                <div class="text-[11px] font-semibold text-sky-400 flex items-center gap-1.5 font-mono">
+                  <i data-lucide="help-circle" class="w-3.5 h-3.5"></i>
+                  <span>Warum diese Strategie andere Optionen schlägt:</span>
+                </div>
+                <p id="chain-opt-why-beats" class="text-slate-300 leading-snug">
+                  Berechne mathematischen Vorteil...
+                </p>
+              </div>
+
+              <!-- Signals and Execution Details -->
+              <div class="flex flex-wrap items-center gap-2 pt-1" id="chain-opt-signals-container">
+                <!-- Dynamically filled with key signals -->
+              </div>
+            </div>
+
+            <!-- Right Execution / Actions Block -->
+            <div class="flex flex-col sm:flex-row lg:flex-col gap-2.5 w-full lg:w-72 self-stretch justify-center bg-darkbg/70 p-3.5 rounded-xl border border-cardborder">
+              <div class="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Empfohlene Ausführung:</div>
+              <div id="chain-opt-execution-summary" class="text-xs font-mono text-emerald-400 font-semibold bg-emerald-950/40 p-2 rounded-lg border border-emerald-900/50">
+                45 DTE Spreads
+              </div>
+              <div class="text-[10px] text-slate-400" id="chain-opt-exit-rule">
+                Exit: 50% Profit Target | 2.0x Stop Loss
+              </div>
+              <div class="pt-2 flex items-center gap-2">
+                <button id="btn-jump-strategy" onclick="jumpToStrategyTab()" class="w-full bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold py-1.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow">
+                  <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                  <span>Setup ansehen</span>
+                </button>
+                <button onclick="askCopilotAboutChain()" class="bg-indigo-950/60 hover:bg-indigo-900/80 text-indigo-300 border border-indigo-700/60 font-semibold py-1.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1 transition" title="Mit KI Copilot analysieren">
+                  <i data-lucide="bot" class="w-3.5 h-3.5 text-indigo-400"></i>
+                  <span>KI</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Live Ticker KPI Ribbon -->
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-3 border-t border-cardborder/60 font-mono">
           <div class="bg-darkbg/80 p-3 rounded-xl border border-cardborder/60">
@@ -1982,6 +2052,20 @@
           if (t.confidence_score >= 85) confColor = 'bg-emerald-500/20 text-accentgreen border-emerald-500/40';
           else if (t.confidence_score < 70) confColor = 'bg-gray-500/20 text-gray-400 border-gray-500/40';
 
+          const opt = t.optimal_strategy;
+          let recBadge = actionBadge;
+          if (opt) {
+            const shortName = opt.display_name.split('(')[0].trim();
+            recBadge = `
+              <div class="flex flex-col gap-0.5" title="${opt.why_this_strategy_beats_others}">
+                <span class="px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30 font-bold text-xs flex items-center gap-1 whitespace-nowrap">
+                  <i data-lucide="award" class="w-3 h-3 text-sky-400"></i> ${shortName}
+                </span>
+                <span class="text-[10px] text-slate-400 font-mono">${opt.action_type.replace(/_/g, ' ')}</span>
+              </div>
+            `;
+          }
+
           htmlRows += `
             <tr class="hover:bg-darkbg/60 transition">
               <td class="px-4 py-3">
@@ -1996,7 +2080,7 @@
               <td class="px-4 py-3 font-mono ${t.net_gex_dollar_m >= 0 ? 'text-emerald-400' : 'text-red-400'}">${t.net_gex_dollar_m >= 0 ? '+' : ''}${t.net_gex_dollar_m}M</td>
               <td class="px-4 py-3">${gammaBadge}</td>
               <td class="px-4 py-3 font-mono text-gray-300">$${t.put_wall} / $${t.call_wall}</td>
-              <td class="px-4 py-3">${actionBadge}</td>
+              <td class="px-4 py-3">${recBadge}</td>
               <td class="px-4 py-3 font-mono text-xs"><span class="text-white font-bold">${t.pop_pct}%</span> / <span class="text-accentcyan">${t.roc_pct}%</span></td>
               <td class="px-4 py-3 text-center">
                 <div class="flex items-center justify-center gap-1.5">
@@ -2787,6 +2871,16 @@
         document.getElementById('chain-pc-ratio').innerText = pcRatio.toFixed(2);
         document.getElementById('chain-max-oi-strike').innerText = `$${maxOiStrike.toFixed(1)}`;
 
+        // Render Optimal Strategy Recommendation for this ticker
+        if (data.optimal_strategy) {
+          renderOptimalStrategyCard(data.optimal_strategy);
+        } else {
+          fetch(`/api/strategy/optimal/${encodeURIComponent(sym)}`)
+            .then(r => r.json())
+            .then(opt => renderOptimalStrategyCard(opt))
+            .catch(() => {});
+        }
+
         if (currentChainView === 'chart') {
           renderChainBarChart();
         } else {
@@ -2800,6 +2894,87 @@
         }
       } finally {
         if (chartLoader) chartLoader.classList.add('hidden');
+      }
+    }
+
+    let currentOptimalStrategy = null;
+
+    function renderOptimalStrategyCard(opt) {
+      if (!opt) return;
+      currentOptimalStrategy = opt;
+
+      const titleEl = document.getElementById('chain-opt-title-text');
+      const confEl = document.getElementById('chain-opt-confidence');
+      const actEl = document.getElementById('chain-opt-action-type');
+      const ratEl = document.getElementById('chain-opt-primary-rationale');
+      const whyEl = document.getElementById('chain-opt-why-beats');
+      const sigContainer = document.getElementById('chain-opt-signals-container');
+      const execEl = document.getElementById('chain-opt-execution-summary');
+      const exitEl = document.getElementById('chain-opt-exit-rule');
+
+      if (titleEl) titleEl.innerText = `${opt.symbol}: ${opt.display_name}`;
+      if (confEl) {
+        confEl.innerText = `Suitability: ${opt.confidence_score}% (Grade ${opt.confidence_grade})`;
+        if (opt.confidence_score >= 90) {
+          confEl.className = 'text-[10px] font-mono font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-700/60 px-2.5 py-1 rounded-full';
+        } else {
+          confEl.className = 'text-[10px] font-mono font-bold bg-amber-950/80 text-amber-300 border border-amber-700/60 px-2.5 py-1 rounded-full';
+        }
+      }
+      if (actEl) {
+        actEl.innerText = opt.action_type.replace(/_/g, ' ');
+      }
+      if (ratEl) ratEl.innerText = opt.primary_rationale;
+      if (whyEl) whyEl.innerText = opt.why_this_strategy_beats_others;
+
+      if (sigContainer) {
+        sigContainer.innerHTML = (opt.key_signals || []).map(s => `
+          <span class="inline-flex items-center gap-1.5 text-[11px] font-mono bg-darkbg border border-cardborder px-2.5 py-1 rounded-lg text-slate-300 shadow-sm">
+            <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
+            ${s}
+          </span>
+        `).join('');
+      }
+
+      if (execEl && opt.suggested_execution) {
+        const exec = opt.suggested_execution;
+        if (exec.long_leaps) {
+          execEl.innerHTML = `<span class="text-sky-300">PMCC:</span> ${exec.long_leaps}<br><span class="text-emerald-300">+ Short:</span> ${exec.short_call}`;
+        } else if (exec.short_strike) {
+          execEl.innerHTML = `<span class="text-emerald-300">${exec.strategy}:</span> Short $${exec.short_strike} / Long $${exec.long_strike} (${exec.dte} DTE)`;
+        } else if (exec.strike) {
+          execEl.innerHTML = `<span class="text-cyan-300">${exec.strategy}:</span> Strike $${exec.strike} (${exec.dte} DTE)`;
+        } else {
+          execEl.innerText = exec.strategy || opt.display_name;
+        }
+      }
+
+      if (exitEl && opt.suggested_execution && opt.suggested_execution.exit_rule) {
+        exitEl.innerText = `Exit: ${opt.suggested_execution.exit_rule}`;
+      }
+
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function jumpToStrategyTab() {
+      if (!currentOptimalStrategy) return;
+      const code = currentOptimalStrategy.strategy_code || '';
+      if (code.includes('LEAPS') || code.includes('ASYMMETRIC')) {
+        switchTab('asymmetric');
+        if (typeof loadAsymmetricSetups === 'function') loadAsymmetricSetups();
+      } else {
+        switchTab('curated');
+        if (typeof loadCuratedSetups === 'function') loadCuratedSetups();
+      }
+    }
+
+    function askCopilotAboutChain() {
+      const sym = (document.getElementById('chain-symbol').value || 'SPY').trim().toUpperCase();
+      switchTab('ai');
+      const input = document.getElementById('ai-prompt-input');
+      if (input) {
+        input.value = `Erkläre mir die optimale quantitative Options-Strategie für ${sym} basierend auf IV Rank, Dealer Gamma und Volumen-Flow.`;
+        if (typeof submitAiPrompt === 'function') submitAiPrompt();
       }
     }
 

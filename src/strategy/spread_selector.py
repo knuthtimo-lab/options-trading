@@ -260,7 +260,7 @@ class SpreadSelector:
         # -------------------------------------------------------------
         # STRATEGY: LEVERAGED LONG CALL (Buying Convexity)
         # -------------------------------------------------------------
-        elif strategy_type in ("LEVERAGED_LONG_CALL", "BUY_OPTIONS", "BULL_CALL_DEBIT_SPREAD"):
+        elif strategy_type in ("LEVERAGED_LONG_CALL", "BUY_OPTIONS", "BULL_CALL_DEBIT_SPREAD", "LONG_STRADDLE_OR_DEBIT_SPREAD"):
             if calls.empty:
                 return None
 
@@ -390,5 +390,11 @@ class SpreadSelector:
                     f"Max risk capped at ${max_loss:.0f}."
                 )
             )
+
+        # Fallback if specific strategy was not triggered
+        if not puts.empty and len(puts) >= 3:
+            return cls.select_best_trade(symbol, chain_df, spot_price, "BULL_PUT_SPREAD", target_dte_min, target_dte_max, risk_free_rate, dividend_yield)
+        elif not calls.empty:
+            return cls.select_best_trade(symbol, chain_df, spot_price, "LEVERAGED_LONG_CALL", target_dte_min, target_dte_max, risk_free_rate, dividend_yield)
 
         return None
