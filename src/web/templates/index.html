@@ -87,10 +87,10 @@
             <span id="header-ai-status">NVIDIA KI</span>
           </button>
           <select id="auto-refresh-select" class="bg-darkbg border border-cardborder text-xs rounded-xl px-2.5 py-1.5 text-slate-300 focus:outline-none focus:border-sky-500 transition font-mono">
-            <option value="0">Auto: Aus</option>
-            <option value="15" selected>Auto: 15s</option>
-            <option value="30">Auto: 30s</option>
+            <option value="0" selected>Auto: Aus</option>
             <option value="60">Auto: 60s</option>
+            <option value="120">Auto: 2 Min</option>
+            <option value="300">Auto: 5 Min</option>
           </select>
           <button id="btn-refresh" onclick="triggerRefresh()" class="flex items-center gap-1.5 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition shadow-sm">
             <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
@@ -985,7 +985,7 @@
       }
     }
 
-    async function fetchSignals() {
+    async function fetchSignals(showFullLoader = false) {
       const symbols = document.getElementById('filter-symbols').value || 'SPY,QQQ,AAPL,NVDA,TSLA';
       const action = document.getElementById('filter-action').value;
       const minConf = document.getElementById('filter-conf').value;
@@ -993,7 +993,16 @@
       const minIvr = document.getElementById('filter-ivr').value;
 
       const tbody = document.getElementById('scanner-table-body');
-      tbody.innerHTML = '<tr><td colspan="11" class="text-center py-8 text-accentcyan animate-pulse">Scanne Live-Optionen & berechne Gamma/Vanna-Exposures und Multi-Faktor Confidence...</td></tr>';
+      const refreshBtn = document.getElementById('btn-refresh');
+      if (refreshBtn) {
+        const icon = refreshBtn.querySelector('i');
+        if (icon) icon.classList.add('animate-spin');
+      }
+
+      if (showFullLoader || tbody.children.length <= 1) {
+        tbody.innerHTML = '<tr><td colspan="11" class="text-center py-8 text-sky-400 font-mono"><div class="inline-flex items-center gap-2"><i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Scanne Live-Optionen & berechne Gamma/Vanna-Exposures...</span></div></td></tr>';
+        if (window.lucide) lucide.createIcons();
+      }
 
       try {
         const url = `/api/scan?symbols=${encodeURIComponent(symbols)}&action=${action}&min_pop=${minPop}&min_iv_rank=${minIvr}&min_confidence=${minConf}`;
@@ -1147,19 +1156,26 @@
         lucide.createIcons();
 
       } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="11" class="text-center py-8 text-red-400">Fehler beim Scannen: ${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="11" class="text-center py-8 text-red-400 font-mono">Fehler beim Scannen: ${e.message}</td></tr>`;
+      } finally {
+        if (refreshBtn) {
+          const icon = refreshBtn.querySelector('i');
+          if (icon) icon.classList.remove('animate-spin');
+        }
       }
     }
 
     // -------------------------------------------------------------
     // UNUSUAL GREEKS & MAGNETS TAB LOGIC
     // -------------------------------------------------------------
-    async function loadUnusualGreeks() {
+    async function loadUnusualGreeks(showFullLoader = false) {
       const cardsGrid = document.getElementById('magnets-cards-grid');
       const tableBody = document.getElementById('anomalies-table-body');
 
-      cardsGrid.innerHTML = '<div class="col-span-full py-8 text-center text-accentpurple animate-pulse">Analysiere Gamma-Magnete & berechne ungewöhnliche Greeks-Flows...</div>';
-      tableBody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-accentpurple animate-pulse">Lade Anomalien-Daten...</td></tr>';
+      if (showFullLoader || tableBody.children.length <= 1) {
+        cardsGrid.innerHTML = '<div class="col-span-full py-8 text-center text-purple-400 font-mono animate-pulse">Analysiere Gamma-Magnete & berechne ungewöhnliche Greeks-Flows...</div>';
+        tableBody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-purple-400 font-mono animate-pulse">Lade Anomalien-Daten...</td></tr>';
+      }
 
       try {
         const res = await fetch('/api/greeks/unusual?symbols=SPY,QQQ,AAPL,NVDA,TSLA,AMD,META,MSFT');
@@ -2231,9 +2247,9 @@
     function triggerRefresh() {
       updateMacro();
       if (activeTab === 'scanner') {
-        fetchSignals();
+        fetchSignals(false);
       } else if (activeTab === 'unusual') {
-        loadUnusualGreeks();
+        loadUnusualGreeks(false);
       } else if (activeTab === 'chain') {
         loadChain();
       } else if (activeTab === 'paper') {
@@ -2241,20 +2257,25 @@
       }
     }
 
-    document.getElementById('auto-refresh-select').addEventListener('change', (e) => {
-      if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-      const secs = parseInt(e.target.value);
-      if (secs > 0) {
-        autoRefreshTimer = setInterval(triggerRefresh, secs * 1000);
-      }
-    });
+    const refreshSelect = document.getElementById('auto-refresh-select');
+    if (refreshSelect) {
+      refreshSelect.addEventListener('change', (e) => {
+        if (autoRefreshTimer) {
+          clearInterval(autoRefreshTimer);
+          autoRefreshTimer = null;
+        }
+        const secs = parseInt(e.target.value);
+        if (secs > 0) {
+          autoRefreshTimer = setInterval(triggerRefresh, secs * 1000);
+        }
+      });
+    }
 
     document.addEventListener('DOMContentLoaded', () => {
       lucide.createIcons();
       updateMacro();
-      fetchSignals();
+      fetchSignals(true);
       checkAiConfig();
-      autoRefreshTimer = setInterval(triggerRefresh, 15000);
     });
   </script>
 </body>

@@ -11,6 +11,7 @@ Institutional-Grade Backend:
 from typing import List, Optional, Dict, Any
 from pathlib import Path
 from datetime import datetime
+import time
 import json
 import numpy as np
 import pandas as pd
@@ -32,6 +33,20 @@ from src.backtest.monte_carlo import MonteCarloSimulator
 from src.engine.unusual_greeks import UnusualGreeksEngine
 from src.backtest.magnet_backtest import MagnetBacktestEngine
 from src.ai.nvidia_copilot import NvidiaQuantCopilot
+
+# Server-Side In-Memory TTL Cache to eliminate lag and repeated network overhead
+_CACHE: Dict[str, Any] = {}
+_CACHE_EXPIRY: Dict[str, float] = {}
+
+def get_from_cache(key: str) -> Optional[Any]:
+    now = time.time()
+    if key in _CACHE and _CACHE_EXPIRY.get(key, 0) > now:
+        return _CACHE[key]
+    return None
+
+def set_in_cache(key: str, value: Any, ttl_seconds: int = 60):
+    _CACHE[key] = value
+    _CACHE_EXPIRY[key] = time.time() + ttl_seconds
 
 app = FastAPI(
     title="Quantitative Options Scanner & Web Dashboard",
@@ -66,15 +81,20 @@ def index():
 
 @app.get("/api/macro")
 def get_macro_status():
-    """Returns macro market indicators (VIX level, SPY reference, current timestamp)."""
+    """Returns macro market indicators (VIX level, SPY reference, current timestamp) with caching."""
+    cached = get_from_cache("macro")
+    if cached:
+        return cached
     try:
         ov = LiveDataFeed.get_ticker_overview("SPY")
-        return {
+        res = {
             "vix": round(ov.vix_level, 2),
             "spy_spot": round(ov.spot_price, 2),
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "status": "LIVE",
         }
+        set_in_cache("macro", res, ttl_seconds=60)
+        return res
     except Exception as e:
         return {
             "vix": 16.5,
@@ -94,7 +114,12 @@ def scan_markets(
     min_confidence: float = Query(0.0, description="Minimum Confidence Score (0-100)"),
     max_dte: int = Query(60, description="Maximum Days to Expiration"),
 ):
-    """Scans requested symbols, runs Confidence Rating, and returns trade setups."""
+    """Scans requested symbols, runs Confidence Rating, and returns trade setups with server-side caching."""
+    cache_key = f"scan:{symbols}:{action}:{min_pop}:{min_roc}:{min_iv_rank}:{min_confidence}:{max_dte}"
+    cached = get_from_cache(cache_key)
+    if cached:
+        return cached
+
     symbol_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
     results = []
 
@@ -125,10 +150,10 @@ def scan_markets(
             if tr.dte > max_dte:
                 continue
 
-            # Moving averages from symbol history
+            # Moving averages from symbol history (period 3mo for fast fetch)
             import yfinance as yf
             ticker_obj = yf.Ticker(sym)
-            hist = ticker_obj.history(period="6mo")
+            hist = ticker_obj.history(period="3mo")
             ema_20 = float(hist['Close'].ewm(span=20).mean().iloc[-1]) if len(hist) >= 20 else ov.spot_price
             ema_50 = float(hist['Close'].ewm(span=50).mean().iloc[-1]) if len(hist) >= 50 else ov.spot_price
             ema_200 = float(hist['Close'].ewm(span=200).mean().iloc[-1]) if len(hist) >= 150 else ema_50
@@ -213,17 +238,24 @@ def scan_markets(
     # Sort descending by Confidence Score
     results.sort(key=lambda x: x["confidence_score"], reverse=True)
 
-    return {
+    data = {
         "count": len(results),
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "trades": results,
     }
+    set_in_cache(cache_key, data, ttl_seconds=60)
+    return data
 
 
 @app.get("/api/gex/profile/{symbol}")
 def get_gamma_profile_by_strike(symbol: str):
-    """Returns Net GEX by Strike and Call/Put Open Interest distribution for visual charts."""
+    """Returns Net GEX by Strike and Call/Put Open Interest distribution for visual charts with caching."""
     symbol = symbol.upper()
+    cache_key = f"gex:{symbol}"
+    cached = get_from_cache(cache_key)
+    if cached:
+        return cached
+
     try:
         spot_price, chain_df = LiveDataFeed.get_options_chain_for_dte_range(symbol, min_dte=10, max_dte=50)
         if chain_df.empty:
@@ -252,11 +284,13 @@ def get_gamma_profile_by_strike(symbol: str):
             })
 
         strike_metrics.sort(key=lambda x: x['strike'])
-        return {
+        res = {
             "symbol": symbol,
             "spot_price": round(spot_price, 2),
             "strikes": strike_metrics,
         }
+        set_in_cache(cache_key, res, ttl_seconds=60)
+        return res
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -295,8 +329,13 @@ def get_options_chain_with_greeks(
     expiration: Optional[str] = None,
     opt_type: str = Query("all", description="all, call, or put"),
 ):
-    """Returns full options chain with 1st and 2nd order Greeks."""
+    """Returns full options chain with 1st and 2nd order Greeks with caching."""
     symbol = symbol.upper()
+    cache_key = f"chain:{symbol}:{expiration}:{opt_type}"
+    cached = get_from_cache(cache_key)
+    if cached:
+        return cached
+
     try:
         spot_price, chain_df = LiveDataFeed.get_options_chain_for_dte_range(symbol, min_dte=5, max_dte=70)
         if chain_df.empty:
@@ -328,7 +367,7 @@ def get_options_chain_with_greeks(
 
             rows.append({
                 "strike": k,
-                "type": o_type.upper(),
+                "option_type": o_type,
                 "bid": float(r_data['bid']),
                 "ask": float(r_data['ask']),
                 "mid": round(float(r_data['mid']), 2),
@@ -346,7 +385,7 @@ def get_options_chain_with_greeks(
                 "speed": round(greeks.speed, 5),
             })
 
-        return {
+        res = {
             "symbol": symbol,
             "spot_price": round(spot_price, 2),
             "expiration": selected_exp,
@@ -354,6 +393,8 @@ def get_options_chain_with_greeks(
             "available_expirations": available_expirations,
             "contracts": rows,
         }
+        set_in_cache(cache_key, res, ttl_seconds=60)
+        return res
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -462,7 +503,12 @@ def calculate_sizing(data: Dict[str, Any] = Body(...)):
 # -------------------------------------------------------------
 @app.get("/api/greeks/unusual")
 def get_unusual_greeks(symbols: str = Query("SPY,QQQ,AAPL,NVDA,TSLA,AMD,META,MSFT")):
-    """Scans symbols for abnormal Gamma/Vanna/Vega volume and identifies Magnet strikes."""
+    """Scans symbols for abnormal Gamma/Vanna/Vega volume and identifies Magnet strikes with caching."""
+    cache_key = f"unusual:{symbols}"
+    cached = get_from_cache(cache_key)
+    if cached:
+        return cached
+
     symbol_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
     reports = []
     all_anomalies = []
@@ -507,11 +553,13 @@ def get_unusual_greeks(symbols: str = Query("SPY,QQQ,AAPL,NVDA,TSLA,AMD,META,MSF
 
     all_anomalies.sort(key=lambda x: x["significance_score"], reverse=True)
 
-    return {
+    res = {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "structures": reports,
         "anomalies": all_anomalies[:25],
     }
+    set_in_cache(cache_key, res, ttl_seconds=60)
+    return res
 
 
 @app.get("/api/backtest/magnet")
