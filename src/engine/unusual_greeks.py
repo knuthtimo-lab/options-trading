@@ -9,15 +9,32 @@ Detects:
    - Primary Gamma Magnet Strike (price gravitation zone)
    - Dynamic Call Resistance Wall
    - Dynamic Put Support Wall
+6. S&P 500 Constituent Parallel Scanner:
+   - Institutional Significance Scoring (0-100)
+   - Anomaly Classification: WHALE_CALL_SWEEP, WHALE_PUT_SWEEP, GAMMA_PINNING, VOL_SQUEEZE, VANNA_SURGE
+   - 15-minute Disk TTL Caching (data_cache/sp500_unusual_greeks.json)
 """
 
-from dataclasses import dataclass
+import os
+import time
+import json
+from pathlib import Path
+import concurrent.futures
+from dataclasses import dataclass, asdict
 from typing import List, Dict, Any, Optional
+from datetime import datetime
 import numpy as np
 import pandas as pd
 
 from src.engine.black_scholes import BlackScholesEngine
+from src.engine.dealer_greeks import DealerGreeksEngine
 from src.data.live_feed import LiveDataFeed
+from src.data.sp500_constituents import get_sp500_symbols, get_symbol_sector
+
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+CACHE_DIR = BASE_DIR / "data_cache"
+CACHE_FILE = CACHE_DIR / "sp500_unusual_greeks.json"
+CACHE_TTL = 15 * 60  # 15 minutes TTL in seconds
 
 
 @dataclass
@@ -242,3 +259,251 @@ class UnusualGreeksEngine:
             total_vanna_volume_m=round(float(df['vanna_vol_m'].sum()), 2),
             anomalies=anomalies[:12],  # Top 12 anomalies
         )
+
+    @classmethod
+    def scan_ticker_anomaly(
+        cls,
+        symbol: str,
+        min_vol_oi: float = 1.2,
+        risk_free_rate: float = 0.045,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Analyzes a single S&P 500 stock for options volume, Vol/OI ratio,
+        Net GEX ($M), Gamma Regime, Vanna volume, Magnet strike, and anomaly classification.
+        """
+        symbol = symbol.strip().upper()
+        try:
+            spot_price, chain_df = LiveDataFeed.get_options_chain_for_dte_range(symbol, min_dte=5, max_dte=60)
+            if chain_df.empty or spot_price <= 0:
+                return None
+        except Exception:
+            return None
+
+        # Focus on strikes within +-25% of spot
+        df = chain_df[chain_df['strike'].between(spot_price * 0.75, spot_price * 1.25)].copy()
+        if df.empty:
+            return None
+
+        df['volume'] = df['volume'].fillna(0.0).astype(float)
+        df['open_interest'] = df['open_interest'].fillna(0.0).astype(float)
+
+        calls_df = df[df['option_type'].isin(['c', 'call'])]
+        puts_df = df[df['option_type'].isin(['p', 'put'])]
+        call_vol = float(calls_df['volume'].sum())
+        put_vol = float(puts_df['volume'].sum())
+        total_vol = call_vol + put_vol
+
+        if total_vol < 10.0:
+            return None
+
+        put_call_ratio = round(put_vol / max(1.0, call_vol), 2)
+
+        # Greeks and Volume calculations per strike
+        g_vol_m_list = []
+        va_vol_m_list = []
+        vol_oi_list = []
+
+        for _, row in df.iterrows():
+            k = float(row['strike'])
+            o_type = str(row['option_type']).lower()
+            dte = max(1, int(row.get('dte', 30)))
+            T = dte / 365.0
+            iv = max(0.05, float(row.get('implied_volatility', 0.20)))
+            vol = float(row['volume'])
+            oi = float(row['open_interest'])
+
+            greeks = BlackScholesEngine.calculate_all_greeks(o_type, spot_price, k, T, risk_free_rate, iv)
+
+            # Gamma Dollar Volume ($M)
+            g_vol_m = vol * greeks.gamma * (spot_price ** 2) * 0.01 / 1e6
+            # Vanna Volume ($M)
+            va_vol_m = vol * abs(greeks.vanna) * spot_price * 100.0 / 1e6
+            ratio = vol / max(1.0, oi)
+
+            g_vol_m_list.append(g_vol_m)
+            va_vol_m_list.append(va_vol_m)
+            vol_oi_list.append(ratio)
+
+        df['gamma_vol_m'] = g_vol_m_list
+        df['vanna_vol_m'] = va_vol_m_list
+        df['vol_oi_ratio'] = vol_oi_list
+
+        # Maximum Vol/OI strike ratio and contract volume
+        active_df = df[df['volume'] >= 20]
+        if active_df.empty:
+            active_df = df[df['volume'] >= 5]
+        if active_df.empty:
+            active_df = df
+
+        max_row = active_df.sort_values('vol_oi_ratio', ascending=False).iloc[0]
+        max_vol_oi_ratio = round(float(max_row['vol_oi_ratio']), 2)
+        max_vol_oi_strike = round(float(max_row['strike']), 2)
+        max_vol_oi_contract_vol = int(float(max_row['volume']))
+        max_vol_oi_type = str(max_row['option_type']).upper()
+
+        # Dealer Greeks analysis (Net GEX & Gamma Regime)
+        dealer_profile = DealerGreeksEngine.analyze_options_chain(chain_df, spot_price, risk_free_rate=risk_free_rate)
+        net_gex_m = round(dealer_profile.net_gex_dollar_1pct / 1e6, 2)
+        gamma_regime = dealer_profile.gamma_regime
+
+        # Total Vanna volume ($M)
+        total_vanna_m = round(float(df['vanna_vol_m'].sum()), 2)
+
+        # Primary Gamma Magnet Strike and distance %
+        strike_gamma = df.groupby('strike')['gamma_vol_m'].sum()
+        primary_magnet_strike = round(float(strike_gamma.idxmax()), 2)
+        magnet_dist_pct = round(((primary_magnet_strike - spot_price) / spot_price) * 100.0, 2)
+
+        # Anomaly Classification:
+        # WHALE_CALL_SWEEP, WHALE_PUT_SWEEP, GAMMA_PINNING, VOL_SQUEEZE, VANNA_SURGE
+        if gamma_regime == "NEGATIVE_GAMMA" and (max_vol_oi_type in ['C', 'CALL'] or call_vol > put_vol * 1.3) and max_vol_oi_ratio >= min_vol_oi:
+            classification = "VOL_SQUEEZE"
+        elif abs(magnet_dist_pct) <= 1.5 and gamma_regime == "POSITIVE_GAMMA" and net_gex_m > 0.5:
+            classification = "GAMMA_PINNING"
+        elif total_vanna_m >= 5.0 and (total_vanna_m > abs(net_gex_m) * 1.5 or total_vanna_m >= 15.0):
+            classification = "VANNA_SURGE"
+        elif max_vol_oi_type in ['P', 'PUT'] and (put_call_ratio >= 1.1 or max_vol_oi_ratio >= min_vol_oi * 1.3 or put_vol > call_vol):
+            classification = "WHALE_PUT_SWEEP"
+        elif max_vol_oi_type in ['C', 'CALL'] and max_vol_oi_ratio >= min_vol_oi:
+            classification = "WHALE_CALL_SWEEP"
+        else:
+            classification = "WHALE_CALL_SWEEP" if call_vol >= put_vol else "WHALE_PUT_SWEEP"
+
+        # Institutional Significance Score (0 - 100)
+        voi_score = min(40.0, (max_vol_oi_ratio / 3.0) * 25.0)
+        vol_score = min(25.0, float(np.log10(max(10.0, total_vol))) * 6.0)
+        gex_score = min(20.0, (abs(net_gex_m) / 5.0) * 15.0)
+        vanna_score = min(15.0, (total_vanna_m / 5.0) * 10.0)
+        raw_score = voi_score + vol_score + gex_score + vanna_score
+
+        if classification == "VOL_SQUEEZE":
+            raw_score += 6.0
+        elif classification == "GAMMA_PINNING" and abs(magnet_dist_pct) < 0.8:
+            raw_score += 5.0
+        elif classification in ["WHALE_CALL_SWEEP", "WHALE_PUT_SWEEP"] and max_vol_oi_ratio >= 3.0:
+            raw_score += 5.0
+
+        significance_score = round(min(99.0, max(15.0, raw_score)), 1)
+        sector = get_symbol_sector(symbol) or "Uncategorized"
+
+        return {
+            "symbol": symbol,
+            "sector": sector,
+            "spot_price": round(spot_price, 2),
+            "total_volume": int(total_vol),
+            "call_volume": int(call_vol),
+            "put_volume": int(put_vol),
+            "put_call_ratio": put_call_ratio,
+            "max_vol_oi_ratio": max_vol_oi_ratio,
+            "max_vol_oi_strike": max_vol_oi_strike,
+            "max_vol_oi_contract_volume": max_vol_oi_contract_vol,
+            "max_vol_oi_option_type": max_vol_oi_type,
+            "net_gex_m": net_gex_m,
+            "gamma_regime": gamma_regime,
+            "total_vanna_m": total_vanna_m,
+            "primary_magnet_strike": primary_magnet_strike,
+            "magnet_distance_pct": magnet_dist_pct,
+            "anomaly_classification": classification,
+            "significance_score": significance_score,
+        }
+
+    @classmethod
+    def scan_sp500_anomalies(
+        cls,
+        top_n: int = 50,
+        max_workers: int = 16,
+        min_vol_oi: float = 1.2,
+        symbols: Optional[List[str]] = None,
+        force_refresh: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """
+        Scans S&P 500 stocks in parallel using concurrent.futures.ThreadPoolExecutor.
+        Calculates Spot price, Total options volume, Put/Call ratio, Max Vol/OI strike ratio,
+        Net GEX ($M), Gamma Regime, Total Vanna volume ($M), Primary Gamma Magnet Strike,
+        Anomaly classification, and Institutional Significance Score (0-100).
+        Results are cached to data_cache/sp500_unusual_greeks.json with a 15-minute TTL.
+        """
+        # 1. Check disk cache
+        if not force_refresh and symbols is None:
+            cache_candidates = [
+                CACHE_FILE,
+                BASE_DIR / "src" / "data" / "sp500_unusual_greeks.json",
+                Path(__file__).resolve().parent.parent / "data" / "sp500_unusual_greeks.json",
+            ]
+            for p in cache_candidates:
+                if p.exists():
+                    try:
+                        with open(p, "r", encoding="utf-8") as f:
+                            cache_payload = json.load(f)
+                        cached_at = cache_payload.get("cached_at", 0)
+                        # On serverless cold start, allow older cache if no fresh cache exists
+                        if (time.time() - cached_at < CACHE_TTL) or p != CACHE_FILE:
+                            cached_results = cache_payload.get("results", [])
+                            filtered = [r for r in cached_results if r.get("max_vol_oi_ratio", 0) >= min_vol_oi]
+                            filtered.sort(key=lambda x: x.get("significance_score", 0), reverse=True)
+                            return filtered[:top_n]
+                    except Exception:
+                        pass
+
+        # 2. Determine symbols to scan
+        if symbols is None:
+            symbols_to_scan = get_sp500_symbols(normalize_for_yf=True)
+        else:
+            symbols_to_scan = [s.strip().upper().replace(".", "-") for s in symbols if s.strip()]
+
+        # 3. Parallel scan across workers
+        results: List[Dict[str, Any]] = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_symbol = {
+                executor.submit(cls.scan_ticker_anomaly, sym, min_vol_oi): sym
+                for sym in symbols_to_scan
+            }
+            for future in concurrent.futures.as_completed(future_to_symbol):
+                try:
+                    res = future.result()
+                    if res:
+                        results.append(res)
+                except Exception:
+                    continue
+
+        # Sort by significance score descending
+        results.sort(key=lambda x: x.get("significance_score", 0), reverse=True)
+
+        # 4. Save to disk cache
+        try:
+            CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            cache_payload = {
+                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "cached_at": time.time(),
+                "ttl_seconds": CACHE_TTL,
+                "total_scanned": len(symbols_to_scan),
+                "total_anomalies": len(results),
+                "results": results,
+            }
+            with open(CACHE_FILE, "w", encoding="utf-8") as f:
+                json.dump(cache_payload, f, indent=2)
+        except Exception:
+            pass
+
+        # Filter by min_vol_oi and slice top_n
+        filtered = [r for r in results if r.get("max_vol_oi_ratio", 0) >= min_vol_oi]
+        return filtered[:top_n]
+
+
+def scan_sp500_anomalies(
+    top_n: int = 50,
+    max_workers: int = 16,
+    min_vol_oi: float = 1.2,
+    symbols: Optional[List[str]] = None,
+    force_refresh: bool = False,
+) -> List[Dict[str, Any]]:
+    """
+    Convenience module-level function for scanning S&P 500 options anomalies.
+    """
+    return UnusualGreeksEngine.scan_sp500_anomalies(
+        top_n=top_n,
+        max_workers=max_workers,
+        min_vol_oi=min_vol_oi,
+        symbols=symbols,
+        force_refresh=force_refresh,
+    )

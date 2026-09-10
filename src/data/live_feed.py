@@ -184,3 +184,15 @@ class LiveDataFeed:
                     })
 
         return spot_price, pd.DataFrame(all_rows)
+
+    @staticmethod
+    def get_sp500_constituents(use_cache: bool = True) -> List[str]:
+        """Returns all constituent symbols in the S&P 500 index."""
+        from src.data.sp500 import SP500ConstituentProvider
+        return SP500ConstituentProvider.get_constituents(use_cache=use_cache)
+
+    @staticmethod
+    def is_sp500_member(symbol: str) -> bool:
+        """Checks if a ticker belongs to the S&P 500 universe."""
+        from src.data.sp500 import SP500ConstituentProvider
+        return SP500ConstituentProvider.is_member(symbol)

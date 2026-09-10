@@ -42,6 +42,12 @@ class AsymmetricLongSetup:
     iv_rank: float
     catalyst_reason: str
     exit_rules: Dict[str, str]
+    # Flow Squeeze Anomaly Enhancements
+    flow_squeeze_alert: bool = False
+    target_profit_potential: str = "300% - 800% ROI"
+    strategy_score: float = 85.0
+    vol_oi_ratio: float = 1.0
+    unusual_flow_type: Optional[str] = None
 
 
 @dataclass
@@ -84,6 +90,28 @@ class AsymmetricEngine:
         elif 'iv' not in df.columns and 'impliedVolatility' in df.columns:
             df['iv'] = df['impliedVolatility']
         return df
+
+    @classmethod
+    def detect_flow_anomaly(
+        cls,
+        vol_oi_ratio: float,
+        gamma: float = 0.0,
+        vanna: float = 0.0,
+        threshold: float = 2.5,
+    ) -> tuple[bool, str, float]:
+        """
+        Evaluates unusual options flow anomaly (e.g. Vol/OI > 2.5x with positive Gamma/Vanna surge).
+        Returns: (flow_squeeze_alert, anomaly_type_desc, score)
+        """
+        if vol_oi_ratio >= threshold and (gamma > 0.005 or abs(vanna) > 0.01):
+            score = min(99.0, 88.0 + (vol_oi_ratio - threshold) * 2.5 + min(10.0, gamma * 200.0))
+            desc = f"UNUSUAL_GAMMA_VANNA_SURGE: Vol/OI {vol_oi_ratio:.1f}x with Gamma {gamma:.4f} & Vanna {vanna:.4f}"
+            return True, desc, round(score, 1)
+        elif vol_oi_ratio >= threshold:
+            score = min(95.0, 82.0 + (vol_oi_ratio - threshold) * 2.5)
+            desc = f"UNUSUAL_SWEEP_FLOW: Vol/OI {vol_oi_ratio:.1f}x exceeds institutional threshold"
+            return True, desc, round(score, 1)
+        return False, "STANDARD_FLOW", 75.0
 
     @classmethod
     def scan_asymmetric_longs(
@@ -160,20 +188,59 @@ class AsymmetricEngine:
                 entry = round(mid, 2)
                 max_risk = entry * 100.0
                 breakeven = round(strike + entry, 2)
-                target_1 = round(entry * 3.0, 2)  # +200%
-                target_2 = round(entry * 5.0, 2)  # +400%
-                target_3 = round(entry * 9.0, 2)  # +800%
                 stop_loss = round(entry * 0.50, 2)  # -50%
 
-                catalyst = (
-                    f"Niedrige IV (IVR {iv_rank:.1f}%) bietet extrem günstige Optionspreise. "
-                    f"Bei Momentum erzeugt Gamma ({greeks.gamma:.4f}) eine Delta-Explosion von {delta:.2f} auf 0.70+."
+                # Flow Anomaly & Whale Sweep Detection
+                call_vol = float(best_call.get('volume', 0.0) or 0.0)
+                call_oi = float(best_call.get('open_interest', 0.0) or 0.0)
+                ratio = call_vol / max(1.0, call_oi) if call_oi > 0 else (call_vol if call_vol > 0 else 1.0)
+
+                # Check if any call contract in this expiration experienced massive sweep
+                if 'volume' in calls.columns and 'open_interest' in calls.columns:
+                    active_calls = calls[(calls['volume'] >= 50) & (calls['open_interest'] > 0)]
+                    if not active_calls.empty:
+                        chain_max_ratio = float((active_calls['volume'] / active_calls['open_interest']).max())
+                        ratio = max(ratio, chain_max_ratio)
+
+                vanna_val = getattr(greeks, 'vanna', 0.0)
+                is_flow_alert, flow_desc, score = cls.detect_flow_anomaly(
+                    vol_oi_ratio=ratio,
+                    gamma=greeks.gamma,
+                    vanna=vanna_val,
+                    threshold=2.5,
                 )
 
+                if is_flow_alert:
+                    roi_potential = "300% - 800% ROI"
+                    target_1 = round(entry * 4.0, 2)  # +300%
+                    target_2 = round(entry * 6.0, 2)  # +500%
+                    target_3 = round(entry * 9.0, 2)  # +800%
+                    catalyst = (
+                        f"🚨 FLOW SQUEEZE ALERT: Institutional Whale Sweep detektiert (Vol/OI {ratio:.1f}x). "
+                        f"Gamma ({greeks.gamma:.4f}) und Vanna erzeugen massiven Kaufdruck der Dealer Richtung ${strike * 1.05:.2f}+."
+                    )
+                    tp_ladder_desc = (
+                        f"Stufe 1 (+300% bei ${target_1:.2f}): 40% der Position sichern. "
+                        f"Stufe 2 (+500% bei ${target_2:.2f}): Weitere 30% schließen. "
+                        f"Stufe 3 (+800% bei ${target_3:.2f}): Restgewinn mit dynamischem Trailing-Stop maximieren."
+                    )
+                else:
+                    roi_potential = "300% - 800% ROI"
+                    target_1 = round(entry * 3.0, 2)  # +200%
+                    target_2 = round(entry * 5.0, 2)  # +400%
+                    target_3 = round(entry * 9.0, 2)  # +800%
+                    catalyst = (
+                        f"Niedrige IV (IVR {iv_rank:.1f}%) bietet extrem günstige Optionspreise. "
+                        f"Bei Momentum erzeugt Gamma ({greeks.gamma:.4f}) eine Delta-Explosion von {delta:.2f} auf 0.70+."
+                    )
+                    tp_ladder_desc = (
+                        f"Stufe 1 (+200% bei ${target_1:.2f}): 40% der Position schließen. "
+                        f"Stufe 2 (+400% bei ${target_2:.2f}): Weitere 30% schließen. "
+                        f"Stufe 3 (+800% bei ${target_3:.2f}): Rest mit Trailing Stop laufen lassen."
+                    )
+
                 exit_rules = {
-                    "tp_ladder": f"Stufe 1 (+200% bei ${target_1:.2f}): 40% der Position schließen. "
-                                 f"Stufe 2 (+400% bei ${target_2:.2f}): Weitere 30% schließen. "
-                                 f"Stufe 3 (+800% bei ${target_3:.2f}): Rest mit Trailing Stop laufen lassen.",
+                    "tp_ladder": tp_ladder_desc,
                     "sl_rule": f"Strikter Stop-Loss bei -50% Verlust (${stop_loss:.2f}) oder spätestens bei 14 DTE schließen, um Theta-Burn zu vermeiden."
                 }
 
@@ -199,6 +266,11 @@ class AsymmetricEngine:
                     iv_rank=round(iv_rank, 1),
                     catalyst_reason=catalyst,
                     exit_rules=exit_rules,
+                    flow_squeeze_alert=is_flow_alert,
+                    target_profit_potential=roi_potential,
+                    strategy_score=score,
+                    vol_oi_ratio=round(ratio, 2),
+                    unusual_flow_type=flow_desc if is_flow_alert else None,
                 ))
 
         # B. ASYMMETRIC LONG PUT (Downside Crash Convexity)
@@ -217,20 +289,58 @@ class AsymmetricEngine:
                 entry = round(mid, 2)
                 max_risk = entry * 100.0
                 breakeven = round(strike - entry, 2)
-                target_1 = round(entry * 3.0, 2)  # +200%
-                target_2 = round(entry * 5.0, 2)  # +400%
-                target_3 = round(entry * 9.0, 2)  # +800%
                 stop_loss = round(entry * 0.50, 2)  # -50%
 
-                catalyst = (
-                    f"Günstiges Put-Pricing (IVR {iv_rank:.1f}%). "
-                    f"Bei Abwärtsbeschleunigung explodieren IV (Vega-Gain) und Gamma gleichzeitig."
+                # Flow Anomaly & Whale Sweep Detection for Puts
+                put_vol = float(best_put.get('volume', 0.0) or 0.0)
+                put_oi = float(best_put.get('open_interest', 0.0) or 0.0)
+                ratio_p = put_vol / max(1.0, put_oi) if put_oi > 0 else (put_vol if put_vol > 0 else 1.0)
+
+                if 'volume' in puts.columns and 'open_interest' in puts.columns:
+                    active_puts = puts[(puts['volume'] >= 50) & (puts['open_interest'] > 0)]
+                    if not active_puts.empty:
+                        chain_max_ratio_p = float((active_puts['volume'] / active_puts['open_interest']).max())
+                        ratio_p = max(ratio_p, chain_max_ratio_p)
+
+                vanna_val_p = getattr(greeks, 'vanna', 0.0)
+                is_flow_alert_p, flow_desc_p, score_p = cls.detect_flow_anomaly(
+                    vol_oi_ratio=ratio_p,
+                    gamma=greeks.gamma,
+                    vanna=vanna_val_p,
+                    threshold=2.5,
                 )
 
+                if is_flow_alert_p:
+                    roi_potential_p = "300% - 800% ROI"
+                    target_1 = round(entry * 4.0, 2)  # +300%
+                    target_2 = round(entry * 6.0, 2)  # +500%
+                    target_3 = round(entry * 9.0, 2)  # +800%
+                    catalyst = (
+                        f"🚨 FLOW SQUEEZE ALERT: Aggressiver Put-Sweep detektiert (Vol/OI {ratio_p:.1f}x). "
+                        f"Dealer Short-Gamma Beschleunigung und explodierende Volatilität generieren 300% bis 800% Crash-Konvexität."
+                    )
+                    tp_ladder_desc_p = (
+                        f"Stufe 1 (+300% bei ${target_1:.2f}): 40% sichern. "
+                        f"Stufe 2 (+500% bei ${target_2:.2f}): Weitere 30% schließen. "
+                        f"Stufe 3 (+800% bei ${target_3:.2f}): Rest im Downside-Move trailen."
+                    )
+                else:
+                    roi_potential_p = "300% - 800% ROI"
+                    target_1 = round(entry * 3.0, 2)  # +200%
+                    target_2 = round(entry * 5.0, 2)  # +400%
+                    target_3 = round(entry * 9.0, 2)  # +800%
+                    catalyst = (
+                        f"Günstiges Put-Pricing (IVR {iv_rank:.1f}%). "
+                        f"Bei Abwärtsbeschleunigung explodieren IV (Vega-Gain) und Gamma gleichzeitig."
+                    )
+                    tp_ladder_desc_p = (
+                        f"Stufe 1 (+200% bei ${target_1:.2f}): 40% schließen. "
+                        f"Stufe 2 (+400% bei ${target_2:.2f}): Weitere 30% schließen. "
+                        f"Stufe 3 (+800% bei ${target_3:.2f}): Rest trailen."
+                    )
+
                 exit_rules = {
-                    "tp_ladder": f"Stufe 1 (+200% bei ${target_1:.2f}): 40% schließen. "
-                                 f"Stufe 2 (+400% bei ${target_2:.2f}): Weitere 30% schließen. "
-                                 f"Stufe 3 (+800% bei ${target_3:.2f}): Rest trailen.",
+                    "tp_ladder": tp_ladder_desc_p,
                     "sl_rule": f"Strikter Stop-Loss bei -50% (${stop_loss:.2f}) oder 14 DTE Notausstieg."
                 }
 
@@ -256,6 +366,11 @@ class AsymmetricEngine:
                     iv_rank=round(iv_rank, 1),
                     catalyst_reason=catalyst,
                     exit_rules=exit_rules,
+                    flow_squeeze_alert=is_flow_alert_p,
+                    target_profit_potential=roi_potential_p,
+                    strategy_score=score_p,
+                    vol_oi_ratio=round(ratio_p, 2),
+                    unusual_flow_type=flow_desc_p if is_flow_alert_p else None,
                 ))
 
         return results
