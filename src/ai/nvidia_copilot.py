@@ -43,7 +43,8 @@ class NvidiaQuantCopilot:
     def get_api_key(cls) -> Optional[str]:
         if cls._api_key_override is not None:
             return cls._api_key_override if cls._api_key_override else None
-        return os.getenv("NVIDIA_API_KEY")
+        key = os.getenv("NVIDIA_API_KEY")
+        return key.strip() if key else None
 
     @classmethod
     def get_model(cls) -> str:
@@ -132,13 +133,13 @@ class NvidiaQuantCopilot:
         return context_data
 
     @classmethod
-    def chat(cls, user_message: str, chat_history: List[Dict[str, str]] = None) -> Dict[str, Any]:
+    def chat(cls, user_message: str, chat_history: List[Dict[str, str]] = None, api_key_override: Optional[str] = None, model_override: Optional[str] = None) -> Dict[str, Any]:
         """
         Processes a user question, retrieves real-time market data & indicators,
         and queries the NVIDIA NIM Supermodel.
         """
-        api_key = cls.get_api_key()
-        model_name = cls.get_model()
+        api_key = api_key_override.strip() if api_key_override else cls.get_api_key()
+        model_name = model_override.strip() if model_override else cls.get_model()
 
         # Extract symbols and gather real-time data
         symbols = cls.extract_symbols_from_prompt(user_message)

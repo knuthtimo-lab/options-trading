@@ -1118,20 +1118,34 @@
     // -------------------------------------------------------------
     // NVIDIA AI QUANT COPILOT LOGIC
     // -------------------------------------------------------------
+    // NVIDIA AI COPILOT & MODAL HANDLERS
+    // -------------------------------------------------------------
     async function checkAiConfig() {
       try {
+        const localKey = localStorage.getItem('nvidia_api_key') || '';
+        const localModel = localStorage.getItem('nvidia_model') || '';
+
         const res = await fetch('/api/ai/config');
         const data = await res.json();
-        document.getElementById('ai-model-badge').innerText = data.model;
+        
+        const activeModel = localModel || data.model;
+        document.getElementById('ai-model-badge').innerText = activeModel;
+
         if (data.available_models && data.available_models.length > 0) {
           const select = document.getElementById('modal-model-select');
           select.innerHTML = data.available_models.map(m => 
-            `<option value="${m.id}" ${m.id === data.model ? 'selected' : ''}>${m.name}</option>`
+            `<option value="${m.id}" ${m.id === activeModel ? 'selected' : ''}>${m.name}</option>`
           ).join('');
         }
-        if (data.has_api_key) {
-          document.getElementById('ai-key-btn-text').innerText = `Key: ${data.api_key_status}`;
+
+        const effectiveKey = localKey || (data.has_api_key ? data.api_key_status : '');
+        if (effectiveKey) {
+          const masked = localKey ? (localKey.length > 10 ? `${localKey.slice(0, 6)}...${localKey.slice(-4)}` : 'GESPEICHERT') : data.api_key_status;
+          document.getElementById('ai-key-btn-text').innerText = `Key: ${masked}`;
           document.getElementById('header-ai-status').innerText = 'NVIDIA Bereit';
+          if (localKey) {
+            document.getElementById('modal-api-key').value = localKey;
+          }
         } else {
           document.getElementById('ai-key-btn-text').innerText = 'API Key eingeben';
           document.getElementById('header-ai-status').innerText = 'NVIDIA KI Setup';
@@ -1142,6 +1156,10 @@
     }
 
     function openAiSettingsModal() {
+      const localKey = localStorage.getItem('nvidia_api_key');
+      if (localKey) {
+        document.getElementById('modal-api-key').value = localKey;
+      }
       document.getElementById('ai-settings-modal').classList.remove('hidden');
     }
 
@@ -1150,20 +1168,30 @@
     }
 
     async function saveAiSettings() {
-      const key = document.getElementById('modal-api-key').value;
+      const key = document.getElementById('modal-api-key').value.trim();
       const model = document.getElementById('modal-model-select').value;
+      
+      if (key) {
+        localStorage.setItem('nvidia_api_key', key);
+      } else {
+        localStorage.removeItem('nvidia_api_key');
+      }
+      if (model) {
+        localStorage.setItem('nvidia_model', model);
+      }
+
       try {
         await fetch('/api/ai/config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ api_key: key, model: model })
         });
-        closeAiSettingsModal();
-        checkAiConfig();
-        alert('NVIDIA KI-Einstellungen erfolgreich gespeichert!');
       } catch (e) {
-        alert('Fehler beim Speichern: ' + e.message);
+        console.warn("Server config sync:", e);
       }
+      closeAiSettingsModal();
+      checkAiConfig();
+      alert('NVIDIA KI-Einstellungen erfolgreich dauerhaft im Browser gespeichert!');
     }
 
     function askAiAboutTicker(sym) {
@@ -1217,10 +1245,18 @@
       btn.disabled = true;
 
       try {
+        const savedKey = localStorage.getItem('nvidia_api_key') || '';
+        const savedModel = localStorage.getItem('nvidia_model') || '';
+
         const res = await fetch('/api/ai/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: prompt, history: aiChatHistory })
+          body: JSON.stringify({
+            prompt: prompt,
+            history: aiChatHistory,
+            api_key: savedKey,
+            model: savedModel
+          })
         });
         const data = await res.json();
         const loadingEl = document.getElementById(loadingId);

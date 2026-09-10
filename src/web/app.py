@@ -529,10 +529,17 @@ def ai_chat(data: Dict[str, Any] = Body(...)):
     """Receives user query, gathers live market tools context, and queries NVIDIA NIM Supermodel."""
     prompt = data.get("prompt", "")
     history = data.get("history", [])
+    api_key = data.get("api_key")
+    model = data.get("model")
     if not prompt:
         raise HTTPException(status_code=400, detail="Prompt must not be empty.")
     
-    res = NvidiaQuantCopilot.chat(user_message=prompt, chat_history=history)
+    res = NvidiaQuantCopilot.chat(
+        user_message=prompt,
+        chat_history=history,
+        api_key_override=api_key,
+        model_override=model
+    )
     return res
 
 
