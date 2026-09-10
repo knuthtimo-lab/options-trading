@@ -33,6 +33,7 @@ from src.backtest.monte_carlo import MonteCarloSimulator
 from src.engine.unusual_greeks import UnusualGreeksEngine
 from src.backtest.magnet_backtest import MagnetBacktestEngine
 from src.ai.nvidia_copilot import NvidiaQuantCopilot
+from src.strategy.asymmetric_engine import AsymmetricEngine
 
 # Server-Side In-Memory TTL Cache to eliminate lag and repeated network overhead
 _CACHE: Dict[str, Any] = {}
@@ -789,3 +790,147 @@ def get_ai_config():
             {"id": "nvidia/nemotron-4-340b-instruct", "name": "NVIDIA Nemotron-4 340B Supermodel"},
         ]
     }
+
+
+# -------------------------------------------------------------
+# ASYMMETRIC LONG & LEAPS / PMCC ENDPOINTS
+# -------------------------------------------------------------
+@app.get("/api/asymmetric/setups")
+def get_asymmetric_setups(
+    symbols: str = Query("SPY,QQQ,AAPL,NVDA,TSLA,AMD,META,MSFT", description="Comma-separated tickers")
+):
+    """
+    Scans for high-convexity opportunities:
+    1. 45 DTE Asymmetric Long Calls/Puts (Home-Run Hunter targeting 200%-800% gains)
+    2. Deep ITM LEAPS (365+ DTE) & Poor Man's Covered Call (PMCC) setups
+    """
+    cache_key = f"asymmetric:{symbols}"
+    cached = get_from_cache(cache_key)
+    if cached:
+        return cached
+
+    sym_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
+    long_setups = []
+    pmcc_setups = []
+
+    for sym in sym_list:
+        try:
+            spot, chain_df = LiveDataFeed.get_options_chain_for_dte_range(sym, min_dte=20, max_dte=500)
+            if spot <= 0 or chain_df.empty:
+                continue
+
+            # Indicators & Context
+            iv_rank = 18.0
+            net_gex = 0.0
+            ema_20 = None
+            ema_50 = None
+            rsi = None
+
+            try:
+                sig = SignalGenerator.analyze_ticker(sym)
+                if sig and sig.overview:
+                    iv_rank = sig.overview.iv_rank
+                    spot = sig.overview.spot_price
+                    ema_20 = sig.overview.ema_20
+                    ema_50 = sig.overview.ema_50
+                    rsi = sig.overview.rsi
+                if sig and sig.gamma_profile:
+                    net_gex = sig.gamma_profile.net_gex
+            except Exception:
+                pass
+
+            # 1. Scan 45 DTE Asymmetric Longs
+            longs = AsymmetricEngine.scan_asymmetric_longs(
+                symbol=sym,
+                spot_price=spot,
+                chain_df=chain_df,
+                iv_rank=iv_rank,
+                net_gex=net_gex,
+                ema_20=ema_20,
+                ema_50=ema_50,
+                rsi=rsi,
+            )
+            for l in longs:
+                long_setups.append({
+                    "symbol": l.symbol,
+                    "option_type": l.option_type,
+                    "strategy_type": l.strategy_type,
+                    "expiration": l.expiration,
+                    "dte": l.dte,
+                    "spot_price": l.spot_price,
+                    "strike": l.strike,
+                    "delta": l.delta,
+                    "gamma": l.gamma,
+                    "vega": l.vega,
+                    "theta_daily": l.theta_daily,
+                    "entry_price": l.entry_price,
+                    "max_risk_dollar": l.max_risk_dollar,
+                    "breakeven_price": l.breakeven_price,
+                    "target_1_price": l.target_1_price,
+                    "target_2_price": l.target_2_price,
+                    "target_3_price": l.target_3_price,
+                    "stop_loss_price": l.stop_loss_price,
+                    "iv_rank": l.iv_rank,
+                    "catalyst_reason": l.catalyst_reason,
+                    "exit_rules": l.exit_rules,
+                })
+
+            # 2. Scan LEAPS & PMCC
+            pmcc = AsymmetricEngine.scan_leaps_pmcc(
+                symbol=sym,
+                spot_price=spot,
+                chain_df=chain_df,
+            )
+            if pmcc:
+                pmcc_setups.append({
+                    "symbol": pmcc.symbol,
+                    "spot_price": pmcc.spot_price,
+                    "leaps_expiration": pmcc.leaps_expiration,
+                    "leaps_dte": pmcc.leaps_dte,
+                    "leaps_strike": pmcc.leaps_strike,
+                    "leaps_delta": pmcc.leaps_delta,
+                    "leaps_entry_price": pmcc.leaps_entry_price,
+                    "short_expiration": pmcc.short_expiration,
+                    "short_dte": pmcc.short_dte,
+                    "short_strike": pmcc.short_strike,
+                    "short_delta": pmcc.short_delta,
+                    "short_entry_price": pmcc.short_entry_price,
+                    "net_debit_dollar": pmcc.net_debit_dollar,
+                    "effective_leverage": pmcc.effective_leverage,
+                    "monthly_yield_pct": pmcc.monthly_yield_pct,
+                    "annualized_yield_pct": pmcc.annualized_yield_pct,
+                    "max_risk_dollar": pmcc.max_risk_dollar,
+                    "breakeven_price": pmcc.breakeven_price,
+                    "reasoning": pmcc.reasoning,
+                    "exit_rules": pmcc.exit_rules,
+                })
+        except Exception as e:
+            continue
+
+    res = {
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "total_asymmetric_longs": len(long_setups),
+        "total_leaps_pmcc": len(pmcc_setups),
+        "asymmetric_longs": long_setups,
+        "leaps_pmcc": pmcc_setups,
+    }
+    set_in_cache(cache_key, res, ttl_seconds=60)
+    return res
+
+
+@app.get("/api/backtest/asymmetric")
+def get_asymmetric_backtest_results():
+    """Returns multi-year backtest comparison between 45 DTE Asymmetric Longs, Barbell 80/20, and LEAPS PMCC."""
+    paths = [
+        BASE_DIR / "backtest_asymmetric.json",
+        BASE_DIR / "data_cache" / "backtest_asymmetric.json",
+        BASE_DIR / "src" / "data" / "backtest_asymmetric.json",
+    ]
+    for p in paths:
+        if p.exists():
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                pass
+    return {"status": "NO_BACKTEST_DATA", "strategies": {}}

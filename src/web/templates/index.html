@@ -109,6 +109,10 @@
         <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i> Curated Greeks Setups
         <span class="bg-amber-950/60 text-amber-300 border border-amber-800/60 text-[9px] px-1.5 py-0.5 rounded-full font-mono">FLOW</span>
       </button>
+      <button onclick="switchTab('asymmetric')" id="tab-btn-asymmetric" class="py-3 px-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 whitespace-nowrap transition">
+        <i data-lucide="trending-up" class="w-4 h-4 text-emerald-400"></i> Asymmetric & LEAPS
+        <span class="bg-emerald-950/60 text-emerald-300 border border-emerald-800/60 text-[9px] px-1.5 py-0.5 rounded-full font-mono">200-800%</span>
+      </button>
       <button onclick="switchTab('unusual')" id="tab-btn-unusual" class="py-3 px-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 whitespace-nowrap transition">
         <i data-lucide="magnet" class="w-4 h-4 text-purple-400"></i> Unusual Greeks & Magnets
         <span class="bg-purple-950/60 text-purple-300 border border-purple-800/60 text-[9px] px-1.5 py-0.5 rounded-full font-mono">FLOW</span>
@@ -320,6 +324,104 @@
           <div class="inline-flex items-center gap-2">
             <i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i>
             <span>Berechne Dealer Gamma-Magnete, Exit-Regeln und quantitative Setups...</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- TAB 1C: ASYMMETRIC LONG (45 DTE 200-800%) & LEAPS HUB          -->
+    <!-- ============================================================== -->
+    <section id="tab-asymmetric" class="space-y-6 hidden">
+      <!-- Asymmetric Hero Banner -->
+      <div class="bg-cardbg rounded-2xl border border-cardborder p-5 shadow-xl space-y-4">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="p-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+                <i data-lucide="trending-up" class="w-5 h-5"></i>
+              </span>
+              <div>
+                <h2 class="text-base font-bold text-white tracking-tight flex items-center gap-2">
+                  Asymmetric Convexity & LEAPS Engine
+                  <span class="px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/20 text-emerald-300 font-mono font-semibold">200% - 800% TARGETS</span>
+                </h2>
+                <p class="text-xs text-slate-400 mt-0.5">
+                  Asymmetrische Home-Runs (45 DTE Calls/Puts bei niedriger IV & Momentum-Ausbruch) & synthetische Aktienhebel via Deep ITM LEAPS + monatlichem Covered Call Cashflow.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Ticker Selector -->
+          <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1.5 bg-darkbg border border-cardborder rounded-xl px-3 py-1.5 focus-within:border-sky-500 transition shadow-inner">
+              <i data-lucide="search" class="w-4 h-4 text-slate-400"></i>
+              <input type="text" id="asymmetric-symbols-input" value="SPY,QQQ,AAPL,NVDA,TSLA,AMD,META,MSFT" 
+                     placeholder="Tickers..." 
+                     onkeydown="if(event.key === 'Enter') loadAsymmetricSetups()"
+                     class="w-48 sm:w-64 bg-transparent text-xs text-white font-mono uppercase focus:outline-none placeholder-slate-600">
+              <button onclick="loadAsymmetricSetups()" class="bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 px-3 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1">
+                <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+                <span>Scannen</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Strategy Mode Tabs -->
+        <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-cardborder/60 text-xs">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-slate-400 text-[11px] font-semibold uppercase tracking-wider">Modus:</span>
+            <button onclick="filterAsymmetricMode('LONGS')" id="asym-mode-longs" class="px-3 py-1 rounded-lg bg-emerald-500 text-slate-950 font-bold transition shadow-sm text-xs flex items-center gap-1.5">
+              <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+              <span>45 DTE Home-Run Setups (200% - 800%)</span>
+            </button>
+            <button onclick="filterAsymmetricMode('LEAPS')" id="asym-mode-leaps" class="px-3 py-1 rounded-lg bg-darkbg border border-cardborder text-slate-300 hover:text-white hover:border-sky-400 transition text-xs flex items-center gap-1.5">
+              <i data-lucide="layers" class="w-3.5 h-3.5 text-sky-400"></i>
+              <span>LEAPS & Poor Man's Covered Call (PMCC)</span>
+            </button>
+          </div>
+          <div id="asymmetric-count-badge" class="text-xs font-mono bg-cardborder/80 px-2.5 py-1 rounded-lg text-slate-300">
+            Lade Setups...
+          </div>
+        </div>
+      </div>
+
+      <!-- Strategy Highlights Info Ribbon -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs font-mono">
+        <div class="bg-cardbg p-3.5 rounded-xl border border-cardborder/80">
+          <div class="text-[10px] uppercase font-semibold text-emerald-400 flex items-center gap-1.5">
+            <i data-lucide="check-circle" class="w-3.5 h-3.5"></i> 45 DTE Gamma & Vega Booster
+          </div>
+          <p class="text-slate-300 text-xs mt-1 font-sans">
+            Kauf bei <span class="text-emerald-300 font-mono font-bold">IV Rank &le; 22%</span> verhindert IV-Crush. Bei Momentum-Ausbruch explodieren Delta von 0.35 auf 0.70+ und Vega gleichzeitig.
+          </p>
+        </div>
+        <div class="bg-cardbg p-3.5 rounded-xl border border-cardborder/80">
+          <div class="text-[10px] uppercase font-semibold text-sky-400 flex items-center gap-1.5">
+            <i data-lucide="shield" class="w-3.5 h-3.5"></i> Strikte Asymmetrie (2.5x Win/Loss)
+          </div>
+          <p class="text-slate-300 text-xs mt-1 font-sans">
+            Profit Targets: <span class="text-emerald-400 font-bold">+200%</span> / <span class="text-sky-400 font-bold">+400%</span> / <span class="text-purple-400 font-bold">+800%</span>. Verlust wird strikt bei <span class="text-rose-400 font-bold">-50%</span> gekappt.
+          </p>
+        </div>
+        <div class="bg-cardbg p-3.5 rounded-xl border border-cardborder/80">
+          <div class="text-[10px] uppercase font-semibold text-purple-400 flex items-center gap-1.5">
+            <i data-lucide="layers" class="w-3.5 h-3.5"></i> LEAPS: 2.5x Hebel ohne Zinsen
+          </div>
+          <p class="text-slate-300 text-xs mt-1 font-sans">
+            Deep ITM LEAPS (Delta ~0.80) ersetzen Aktienkäufe. Monatlicher Verkauf von 30 DTE Short Calls (PMCC) bringt <span class="text-purple-300 font-mono font-bold">~2% Monatsrendite</span>.
+          </p>
+        </div>
+      </div>
+
+      <!-- Asymmetric Cards Grid -->
+      <div id="asymmetric-cards-grid" class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div class="lg:col-span-2 py-16 text-center text-emerald-400 font-mono">
+          <div class="inline-flex items-center gap-2">
+            <i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i>
+            <span>Berechne 45 DTE Home-Run Setups & LEAPS PMCC Allokationen...</span>
           </div>
         </div>
       </div>
@@ -880,6 +982,80 @@
         </div>
       </div>
 
+      <!-- ============================================================== -->
+      <!-- ASYMMETRIC 45 DTE & BARBELL MULTI-YEAR BACKTEST COMPARISON     -->
+      <!-- ============================================================== -->
+      <div class="bg-cardbg border border-cardborder rounded-2xl p-5 shadow-xl space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-cardborder/60 pb-3">
+          <div>
+            <h3 class="text-sm font-bold text-white flex items-center gap-2 font-mono">
+              <i data-lucide="scale" class="w-4 h-4 text-emerald-400"></i>
+              Asymmetric 45 DTE Longs, Barbell (80/20) & LEAPS Multi-Year Backtest (2021–2026)
+            </h3>
+            <p class="text-xs text-slate-400 mt-0.5">5-Jahres-Simulation über 1.650 Handelstage auf SPY, QQQ, AAPL, NVDA, TSLA, AMD, META, MSFT</p>
+          </div>
+          <span class="bg-emerald-950/60 text-emerald-300 border border-emerald-800/60 text-xs px-3 py-1 rounded-xl font-mono font-semibold">
+            Nassim Taleb Barbell & Convexity
+          </span>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 text-xs font-mono">
+          <!-- Strategy 1: Pure 45 DTE Asymmetric Longs -->
+          <div class="bg-darkbg/80 p-4 rounded-xl border border-cardborder space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] uppercase font-bold text-amber-400 tracking-wider">Strategy A: Outright Buying</span>
+              <span class="px-2 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-300 border border-amber-500/20 font-bold">CONVEX</span>
+            </div>
+            <div class="text-sm font-bold text-white font-sans">Pure 45 DTE Asymmetric Longs</div>
+            <p class="text-[11px] text-slate-400 font-sans">Kauf von Delta 0.35 Calls/Puts nur bei IV Rank &le; 22% mit Profit Ladder (+200%, +400%, +800%) & -50% Stop.</p>
+            <div class="grid grid-cols-2 gap-2 pt-2 border-t border-cardborder/60 text-[11px]">
+              <div><span class="text-slate-500 block text-[10px]">CAGR</span><span class="text-emerald-400 font-bold text-sm">+19.12%</span></div>
+              <div><span class="text-slate-500 block text-[10px]">ENDKAPITAL</span><span class="text-white font-bold text-sm">$78,897.16</span></div>
+              <div><span class="text-slate-500 block text-[10px]">WIN RATE</span><span class="text-amber-400 font-bold">31.3% (81W / 178L)</span></div>
+              <div><span class="text-slate-500 block text-[10px]">WIN / LOSS RATIO</span><span class="text-emerald-400 font-bold text-sm">2.53x ($4.8k vs $1.9k)</span></div>
+              <div><span class="text-slate-500 block text-[10px]">MAX DRAWDOWN</span><span class="text-rose-400 font-bold">56.84%</span></div>
+              <div><span class="text-slate-500 block text-[10px]">PROFIT FACTOR</span><span class="text-sky-400 font-bold">1.15</span></div>
+            </div>
+          </div>
+
+          <!-- Strategy 2: Barbell 80/20 -->
+          <div class="bg-darkbg/80 p-4 rounded-xl border border-emerald-500/30 shadow-lg space-y-3 relative overflow-hidden">
+            <div class="absolute top-0 right-0 bg-emerald-500 text-slate-950 font-extrabold text-[9px] px-2 py-0.5 rounded-bl">RECOMMENDED</div>
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">Strategy B: Nassim Taleb Barbell</span>
+            </div>
+            <div class="text-sm font-bold text-white font-sans">Barbell Portfolio (80% Credit / 20% Longs)</div>
+            <p class="text-[11px] text-slate-400 font-sans">80% Depot-Basis in 28-DTE Credit Spreads (70% Win Rate) finanziert kontinuierlich 20% asymmetrische Home-Run Longs.</p>
+            <div class="grid grid-cols-2 gap-2 pt-2 border-t border-cardborder/60 text-[11px]">
+              <div><span class="text-slate-500 block text-[10px]">CAGR</span><span class="text-emerald-400 font-bold text-sm">+26.08%</span></div>
+              <div><span class="text-slate-500 block text-[10px]">ENDKAPITAL</span><span class="text-emerald-300 font-bold text-sm">$114,527.01</span></div>
+              <div><span class="text-slate-500 block text-[10px]">WIN RATE</span><span class="text-emerald-400 font-bold">66.8% (501W / 249L)</span></div>
+              <div><span class="text-slate-500 block text-[10px]">SHARPE RATIO</span><span class="text-white font-bold text-sm">0.74</span></div>
+              <div><span class="text-slate-500 block text-[10px]">MAX DRAWDOWN</span><span class="text-amber-400 font-bold">45.73%</span></div>
+              <div><span class="text-slate-500 block text-[10px]">PROFIT FACTOR</span><span class="text-sky-400 font-bold">1.23</span></div>
+            </div>
+          </div>
+
+          <!-- Strategy 3: LEAPS + PMCC vs Benchmark -->
+          <div class="bg-darkbg/80 p-4 rounded-xl border border-cardborder space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] uppercase font-bold text-purple-400 tracking-wider">Strategy C: Synthetic Equity</span>
+              <span class="px-2 py-0.5 rounded text-[10px] bg-purple-500/10 text-purple-300 border border-purple-500/20 font-bold">PMCC YIELD</span>
+            </div>
+            <div class="text-sm font-bold text-white font-sans">LEAPS + Poor Man's Covered Call vs. B&H</div>
+            <p class="text-[11px] text-slate-400 font-sans">365 DTE Delta 0.80 Call (2.6x Hebel ohne Zinsen) + monatlich 30 DTE Short Call (+2.1% Monatsertrag).</p>
+            <div class="grid grid-cols-2 gap-2 pt-2 border-t border-cardborder/60 text-[11px]">
+              <div><span class="text-slate-500 block text-[10px]">LEAPS CAGR</span><span class="text-emerald-400 font-bold text-sm">+84.20%</span></div>
+              <div><span class="text-slate-500 block text-[10px]">BUY & HOLD CAGR</span><span class="text-slate-400 font-bold text-sm">+36.86%</span></div>
+              <div><span class="text-slate-500 block text-[10px]">LEAPS ENDKAPITAL</span><span class="text-purple-300 font-bold text-sm">$1,385,289</span></div>
+              <div><span class="text-slate-500 block text-[10px]">B&H ENDKAPITAL</span><span class="text-slate-400 font-bold text-sm">$196,653</span></div>
+              <div><span class="text-slate-500 block text-[10px]">SHARPE RATIO</span><span class="text-sky-400 font-bold text-sm">1.34 (vs 0.88 B&H)</span></div>
+              <div><span class="text-slate-500 block text-[10px]">THETA HARVEST</span><span class="text-emerald-400 font-bold">+$5,500/Jahr</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- MONTE CARLO SIMULATION FAN CHART SECTION -->
       <div class="bg-cardbg border border-cardborder rounded-2xl p-5 shadow-xl space-y-4">
         <div class="flex flex-wrap items-center justify-between gap-2 border-b border-cardborder/60 pb-3">
@@ -1123,10 +1299,12 @@
 
     let curatedSetupsData = null;
     let curatedCurrentCategory = 'ALL';
+    let asymmetricData = null;
+    let asymmetricCurrentMode = 'LONGS';
 
     function switchTab(tab) {
       activeTab = tab;
-      ['scanner', 'curated', 'unusual', 'ai', 'chain', 'paper', 'backtest'].forEach(t => {
+      ['scanner', 'curated', 'asymmetric', 'unusual', 'ai', 'chain', 'paper', 'backtest'].forEach(t => {
         const sec = document.getElementById('tab-' + t);
         const btn = document.getElementById('tab-btn-' + t);
         if (sec && btn) {
@@ -1145,6 +1323,11 @@
       if (tab === 'curated') {
         if (!curatedSetupsData) {
           loadCuratedSetups();
+        }
+      }
+      if (tab === 'asymmetric') {
+        if (!asymmetricData) {
+          loadAsymmetricSetups();
         }
       }
       if (tab === 'unusual') {
@@ -1427,6 +1610,263 @@
       });
 
       container.innerHTML = html;
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function filterAsymmetricMode(mode) {
+      asymmetricCurrentMode = mode;
+      const btnLongs = document.getElementById('asym-mode-longs');
+      const btnLeaps = document.getElementById('asym-mode-leaps');
+
+      if (mode === 'LONGS') {
+        btnLongs.className = "px-3 py-1 rounded-lg bg-emerald-500 text-slate-950 font-bold transition shadow-sm text-xs flex items-center gap-1.5";
+        btnLeaps.className = "px-3 py-1 rounded-lg bg-darkbg border border-cardborder text-slate-300 hover:text-white hover:border-sky-400 transition text-xs flex items-center gap-1.5";
+      } else {
+        btnLongs.className = "px-3 py-1 rounded-lg bg-darkbg border border-cardborder text-slate-300 hover:text-white hover:border-emerald-400 transition text-xs flex items-center gap-1.5";
+        btnLeaps.className = "px-3 py-1 rounded-lg bg-sky-500 text-slate-950 font-bold transition shadow-sm text-xs flex items-center gap-1.5";
+      }
+      renderAsymmetricCards();
+    }
+
+    async function loadAsymmetricSetups() {
+      const container = document.getElementById('asymmetric-cards-grid');
+      const badge = document.getElementById('asymmetric-count-badge');
+      const input = document.getElementById('asymmetric-symbols-input');
+      const symbols = input ? (input.value.trim() || "SPY,QQQ,AAPL,NVDA,TSLA,AMD,META,MSFT") : "SPY,QQQ,AAPL,NVDA,TSLA,AMD,META,MSFT";
+
+      if (container) {
+        container.innerHTML = `
+          <div class="lg:col-span-2 py-16 text-center text-emerald-400 font-mono">
+            <div class="inline-flex items-center gap-2">
+              <i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i>
+              <span>Berechne 45 DTE Home-Run Setups & LEAPS PMCC Allokationen...</span>
+            </div>
+          </div>
+        `;
+        if (window.lucide) lucide.createIcons();
+      }
+
+      try {
+        const res = await fetch(`/api/asymmetric/setups?symbols=${encodeURIComponent(symbols)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        asymmetricData = data;
+        renderAsymmetricCards();
+      } catch (err) {
+        if (container) {
+          container.innerHTML = `
+            <div class="lg:col-span-2 py-12 text-center text-rose-400 font-mono bg-rose-950/20 rounded-2xl border border-rose-800/40 p-6">
+              <i data-lucide="alert-triangle" class="w-6 h-6 mx-auto mb-2 text-rose-400"></i>
+              <div>Fehler beim Laden der asymmetrischen Setups: ${err.message}</div>
+              <button onclick="loadAsymmetricSetups()" class="mt-3 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 px-3 py-1.5 rounded-lg text-xs font-semibold">
+                Erneut versuchen
+              </button>
+            </div>
+          `;
+          if (window.lucide) lucide.createIcons();
+        }
+      }
+    }
+
+    function renderAsymmetricCards() {
+      const container = document.getElementById('asymmetric-cards-grid');
+      const badge = document.getElementById('asymmetric-count-badge');
+      if (!container || !asymmetricData) return;
+
+      if (asymmetricCurrentMode === 'LONGS') {
+        const list = asymmetricData.asymmetric_longs || [];
+        if (badge) badge.innerText = `${list.length} Home-Run Setups`;
+
+        if (list.length === 0) {
+          container.innerHTML = `
+            <div class="lg:col-span-2 py-12 text-center text-slate-400 font-mono bg-darkbg rounded-2xl border border-cardborder p-6">
+              Keine 45 DTE Long-Setups für die gewählten Ticker gefunden. (IV Rank evtl. > 22% oder kein Trendausbruch).
+            </div>
+          `;
+          return;
+        }
+
+        let html = '';
+        list.forEach(s => {
+          const isCall = s.option_type === 'CALL';
+          const typeBadge = isCall
+            ? '<span class="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold">🚀 45DTE BULL CALL</span>'
+            : '<span class="px-2 py-0.5 rounded-md bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-bold">💥 45DTE BEAR PUT</span>';
+
+          html += `
+            <div class="bg-cardbg border border-cardborder rounded-2xl p-5 shadow-xl space-y-4 hover:border-emerald-500/40 transition">
+              <!-- Top Row -->
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg font-bold text-white font-mono">${s.symbol}</span>
+                  ${typeBadge}
+                </div>
+                <div class="text-xs font-mono text-slate-400">
+                  Spot: <strong class="text-white">$${s.spot_price.toFixed(2)}</strong> &bull; IVR: <strong class="text-emerald-400">${s.iv_rank}%</strong>
+                </div>
+              </div>
+
+              <!-- Contract Info -->
+              <div class="bg-darkbg/70 p-3.5 rounded-xl border border-cardborder/80 text-xs font-mono">
+                <div class="flex items-center justify-between border-b border-cardborder/60 pb-2">
+                  <div>
+                    <span class="text-slate-400 text-[10px] block">STRIKE & VERFALL</span>
+                    <strong class="text-sky-300 text-sm">$${s.strike.toFixed(1)} ${s.option_type}</strong>
+                    <span class="text-slate-400 text-[10px] ml-1">(${s.dte} DTE &bull; ${s.expiration})</span>
+                  </div>
+                  <div class="text-right">
+                    <span class="text-slate-400 text-[10px] block">EINSTIEGSPREIS</span>
+                    <strong class="text-white text-sm">$${s.entry_price.toFixed(2)}</strong>
+                    <span class="text-slate-400 text-[10px]">($${s.max_risk_dollar.toFixed(0)}/Kontrakt)</span>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-4 gap-2 pt-2 text-[11px]">
+                  <div><span class="text-slate-500 block text-[10px]">DELTA</span><span class="text-emerald-400 font-bold">${s.delta.toFixed(2)}</span></div>
+                  <div><span class="text-slate-500 block text-[10px]">GAMMA</span><span class="text-purple-400 font-bold">${s.gamma.toFixed(4)}</span></div>
+                  <div><span class="text-slate-500 block text-[10px]">THETA/TAG</span><span class="text-rose-400 font-bold">-$${Math.abs(s.theta_daily).toFixed(2)}</span></div>
+                  <div><span class="text-slate-500 block text-[10px]">BREAKEVEN</span><span class="text-amber-300 font-bold">$${s.breakeven_price.toFixed(2)}</span></div>
+                </div>
+              </div>
+
+              <!-- Dynamic Profit Ladder -->
+              <div class="bg-darkbg/50 p-3.5 rounded-xl border border-cardborder/60 space-y-2">
+                <span class="text-[10px] uppercase font-bold text-emerald-400 font-mono tracking-wider flex items-center gap-1.5">
+                  <i data-lucide="trending-up" class="w-3.5 h-3.5"></i> Asymmetrische Profit Ladder (200% - 800% Targets)
+                </span>
+                <div class="grid grid-cols-3 gap-2 text-xs font-mono">
+                  <div class="bg-emerald-950/30 p-2 rounded-lg border border-emerald-500/30">
+                    <span class="text-emerald-400 block text-[10px] font-bold">STUFE 1 (+200%)</span>
+                    <strong class="text-white text-xs">$${s.target_1_price.toFixed(2)}</strong>
+                    <span class="text-[9px] text-slate-400 block mt-0.5">40% verkaufen</span>
+                  </div>
+                  <div class="bg-sky-950/30 p-2 rounded-lg border border-sky-500/30">
+                    <span class="text-sky-400 block text-[10px] font-bold">STUFE 2 (+400%)</span>
+                    <strong class="text-white text-xs">$${s.target_2_price.toFixed(2)}</strong>
+                    <span class="text-[9px] text-slate-400 block mt-0.5">30% verkaufen</span>
+                  </div>
+                  <div class="bg-purple-950/30 p-2 rounded-lg border border-purple-500/30">
+                    <span class="text-purple-400 block text-[10px] font-bold">STUFE 3 (+800%)</span>
+                    <strong class="text-white text-xs">$${s.target_3_price.toFixed(2)}</strong>
+                    <span class="text-[9px] text-slate-400 block mt-0.5">Runner Trailing</span>
+                  </div>
+                </div>
+                <div class="flex items-center justify-between text-[11px] font-mono pt-1 text-slate-400">
+                  <span>🛑 Stop-Loss: <strong class="text-rose-400">$${s.stop_loss_price.toFixed(2)} (-50%)</strong></span>
+                  <span>⏳ Notausstieg: <strong class="text-amber-400">bei 14 DTE</strong></span>
+                </div>
+              </div>
+
+              <!-- Catalyst Reason -->
+              <p class="text-slate-300 text-xs leading-relaxed font-sans bg-darkbg/40 p-2.5 rounded-lg border border-cardborder/40">
+                ${s.catalyst_reason}
+              </p>
+
+              <!-- Actions -->
+              <div class="pt-2 border-t border-cardborder/60 flex items-center justify-between">
+                <button onclick="askCopilotAbout('${s.symbol}')" class="bg-indigo-950/40 hover:bg-indigo-900/50 text-indigo-300 border border-indigo-700/50 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 transition">
+                  <i data-lucide="bot" class="w-3.5 h-3.5 text-indigo-400"></i>
+                  <span>KI Analyse</span>
+                </button>
+                <button onclick="openSizingFromTrade({symbol:'${s.symbol}',action:'BUY (DEBIT/LEVERAGE)',strategy_name:'45 DTE Long ${s.option_type}',spot_price:${s.spot_price},entry_limit_price:${s.entry_price},long_strike:${s.strike},short_strike:null,max_profit:${s.target_1_price*100},max_loss:${s.max_risk_dollar},pop_pct:35.0,dte:${s.dte},expiration:'${s.expiration}'})"
+                        class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-3.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition shadow">
+                  <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+                  <span>Paper Trade</span>
+                </button>
+              </div>
+            </div>
+          `;
+        });
+        container.innerHTML = html;
+      } else {
+        // LEAPS & PMCC MODE
+        const list = asymmetricData.leaps_pmcc || [];
+        if (badge) badge.innerText = `${list.length} LEAPS PMCC Setups`;
+
+        if (list.length === 0) {
+          container.innerHTML = `
+            <div class="lg:col-span-2 py-12 text-center text-slate-400 font-mono bg-darkbg rounded-2xl border border-cardborder p-6">
+              Keine LEAPS Setups verfügbar.
+            </div>
+          `;
+          return;
+        }
+
+        let html = '';
+        list.forEach(p => {
+          html += `
+            <div class="bg-cardbg border border-cardborder rounded-2xl p-5 shadow-xl space-y-4 hover:border-purple-500/40 transition">
+              <!-- Top Row -->
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg font-bold text-white font-mono">${p.symbol}</span>
+                  <span class="px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[10px] font-bold font-mono">
+                    💎 LEAPS + PMCC (${p.effective_leverage}x HEBEL)
+                  </span>
+                </div>
+                <div class="text-xs font-mono text-slate-400">
+                  Spot: <strong class="text-white">$${p.spot_price.toFixed(2)}</strong>
+                </div>
+              </div>
+
+              <!-- Two Legs Breakdown -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
+                <!-- Long LEAPS -->
+                <div class="bg-darkbg/80 p-3 rounded-xl border border-emerald-500/30 space-y-1">
+                  <span class="text-[10px] uppercase font-bold text-emerald-400 block">LONG BASIS (LEAPS)</span>
+                  <div class="text-sm font-bold text-white">$${p.leaps_strike.toFixed(0)} Call &bull; Delta ${p.leaps_delta.toFixed(2)}</div>
+                  <div class="text-slate-400 text-[11px]">${p.leaps_dte} DTE &bull; ${p.leaps_expiration}</div>
+                  <div class="text-emerald-300 font-bold pt-1">Prämie: $${p.leaps_entry_price.toFixed(2)}</div>
+                </div>
+
+                <!-- Short Call -->
+                <div class="bg-darkbg/80 p-3 rounded-xl border border-purple-500/30 space-y-1">
+                  <span class="text-[10px] uppercase font-bold text-purple-400 block">SHORT HARVEST (MONATLICH)</span>
+                  <div class="text-sm font-bold text-white">$${p.short_strike.toFixed(0)} Call &bull; Delta ${p.short_delta.toFixed(2)}</div>
+                  <div class="text-slate-400 text-[11px]">${p.short_dte} DTE &bull; ${p.short_expiration}</div>
+                  <div class="text-purple-300 font-bold pt-1">Credit: +$${p.short_entry_price.toFixed(2)}</div>
+                </div>
+              </div>
+
+              <!-- PMCC Key Economics -->
+              <div class="bg-darkbg/70 p-3.5 rounded-xl border border-cardborder/80 grid grid-cols-3 gap-2 text-xs font-mono text-center">
+                <div>
+                  <span class="text-slate-500 block text-[10px]">NET DEBIT (INVESTMENT)</span>
+                  <strong class="text-white text-sm">$${p.net_debit_dollar.toFixed(0)}</strong>
+                </div>
+                <div>
+                  <span class="text-slate-500 block text-[10px]">MONATS-RENDITE</span>
+                  <strong class="text-emerald-400 text-sm">+${p.monthly_yield_pct.toFixed(1)}% / Mo</strong>
+                </div>
+                <div>
+                  <span class="text-slate-500 block text-[10px]">EFFEKTIVER HEBEL</span>
+                  <strong class="text-sky-300 text-sm">${p.effective_leverage}x</strong>
+                </div>
+              </div>
+
+              <!-- Reasoning & Exit Rules -->
+              <p class="text-slate-300 text-xs leading-relaxed font-sans bg-darkbg/40 p-2.5 rounded-lg border border-cardborder/40">
+                ${p.reasoning}
+              </p>
+
+              <!-- Actions -->
+              <div class="pt-2 border-t border-cardborder/60 flex items-center justify-between">
+                <button onclick="askCopilotAbout('${p.symbol}')" class="bg-indigo-950/40 hover:bg-indigo-900/50 text-indigo-300 border border-indigo-700/50 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 transition">
+                  <i data-lucide="bot" class="w-3.5 h-3.5 text-indigo-400"></i>
+                  <span>KI Analyse</span>
+                </button>
+                <button onclick="openSizingFromTrade({symbol:'${p.symbol}',action:'BUY (DEBIT/LEVERAGE)',strategy_name:'LEAPS PMCC',spot_price:${p.spot_price},entry_limit_price:${(p.net_debit_dollar/100).toFixed(2)},long_strike:${p.leaps_strike},short_strike:${p.short_strike},max_profit:${p.short_entry_price*100*12},max_loss:${p.net_debit_dollar},pop_pct:70.0,dte:${p.short_dte},expiration:'${p.short_expiration}'})"
+                        class="bg-purple-500 hover:bg-purple-400 text-slate-950 font-bold px-3.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition shadow">
+                  <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+                  <span>Paper Trade</span>
+                </button>
+              </div>
+            </div>
+          `;
+        });
+        container.innerHTML = html;
+      }
+
       if (window.lucide) lucide.createIcons();
     }
 

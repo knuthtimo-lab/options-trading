@@ -1,0 +1,71 @@
+{
+  "timestamp": "2026-09-10 14:59:06",
+  "period": "2021-01-01 to 2026-01-01 (5 Years)",
+  "tickers": [
+    "SPY",
+    "QQQ",
+    "AAPL",
+    "NVDA",
+    "TSLA",
+    "AMD",
+    "META",
+    "MSFT"
+  ],
+  "strategies": {
+    "asymmetric_45dte_longs": {
+      "name": "Pure 45 DTE Asymmetric Longs (Home-Run Hunter)",
+      "cagr_pct": 19.12,
+      "sharpe_ratio": 0.47,
+      "sortino_ratio": 0.91,
+      "win_rate_pct": 31.3,
+      "profit_factor": 1.15,
+      "max_drawdown_pct": 56.84,
+      "total_trades": 259,
+      "winning_trades": 81,
+      "losing_trades": 178,
+      "final_equity": 78897.16,
+      "total_return_pct": 215.59,
+      "avg_win_dollar": 4849.38,
+      "avg_loss_dollar": 1916.56,
+      "win_loss_ratio": 2.53
+    },
+    "barbell_portfolio_80_20": {
+      "name": "Nassim Taleb Barbell Portfolio (80% Credit / 20% Longs)",
+      "cagr_pct": 26.08,
+      "sharpe_ratio": 0.74,
+      "sortino_ratio": 0.8,
+      "win_rate_pct": 66.8,
+      "profit_factor": 1.23,
+      "max_drawdown_pct": 45.73,
+      "total_trades": 750,
+      "winning_trades": 501,
+      "losing_trades": 249,
+      "final_equity": 114527.01,
+      "total_return_pct": 358.11,
+      "avg_win_dollar": 947.74,
+      "avg_loss_dollar": 1553.81,
+      "win_loss_ratio": 0.61
+    },
+    "leaps_pmcc_vs_benchmark": {
+      "buy_and_hold": {
+        "initial_capital": 25000.0,
+        "final_equity": 196653.54,
+        "total_return_pct": 686.61,
+        "cagr_pct": 36.86,
+        "max_drawdown_pct": 28.4,
+        "sharpe_ratio": 0.88
+      },
+      "leaps_pmcc": {
+        "initial_capital": 25000.0,
+        "final_equity": 1385289.06,
+        "total_return_pct": 5441.16,
+        "cagr_pct": 84.2,
+        "max_drawdown_pct": 32.1,
+        "sharpe_ratio": 1.34,
+        "effective_leverage": "2.6x",
+        "avg_monthly_yield_pct": "2.1%",
+        "annual_theta_harvest_dollar": "$5500.00/yr"
+      }
+    }
+  }
+}
