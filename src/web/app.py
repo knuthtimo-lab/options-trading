@@ -13,6 +13,7 @@ from pathlib import Path
 from datetime import datetime
 import time
 import json
+import random
 import concurrent.futures
 import numpy as np
 import pandas as pd
@@ -159,6 +160,107 @@ def get_macro_status():
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "status": "CACHED",
         }
+
+
+LIQUID_OPTIONS_SECTORS: Dict[str, Dict[str, Any]] = {
+    "mega_tech": {
+        "name": "Mega-Cap Tech",
+        "description": "Tech-Giganten mit maximaler Liquidität & engsten Spreads",
+        "symbols": ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA", "AMD", "AVGO", "ORCL", "CRM", "NOW"],
+    },
+    "ai_high_beta": {
+        "name": "AI & High Growth / Beta",
+        "description": "Explosive Trendaktien mit hoher Gamma-Dynamik & Momentum",
+        "symbols": ["PLTR", "ARM", "SMCI", "COIN", "MSTR", "HOOD", "SOFI", "CRWD", "SNOW", "NET", "PANW"],
+    },
+    "etfs_commodities": {
+        "name": "Index & Sektor ETFs & Rohstoffe",
+        "description": "Breite Marktindizes und Rohstoffe mit exzellenter Prämie",
+        "symbols": ["SPY", "QQQ", "IWM", "DIA", "SMH", "XLE", "XLF", "XLK", "GLD", "SLV", "GDX", "TLT"],
+    },
+    "bluechips_value": {
+        "name": "Bluechips & Value / Dividenden",
+        "description": "Defensivere Cashflow-Titel, ideal für Credit Spreads & Covered Calls",
+        "symbols": ["JPM", "BAC", "GS", "MS", "V", "MA", "XOM", "CVX", "OXY", "CAT", "BA", "GE"],
+    },
+    "consumer_cyclical": {
+        "name": "Consumer Leaders & Cyclicals",
+        "description": "Führende Konsum- und Entertainment-Schwergewichte",
+        "symbols": ["NFLX", "DIS", "NKE", "SBUX", "COST", "WMT", "TGT", "HD", "MCD", "ABNB", "UBER", "SPOT"],
+    },
+    "healthcare_bio": {
+        "name": "Healthcare & Pharma",
+        "description": "Gesundheitsriesen mit stabiler Trendfolge",
+        "symbols": ["LLY", "UNH", "JNJ", "PFE", "ABBV", "MRK", "AMGN", "BMY", "ISRG", "GILD"],
+    },
+}
+
+ALL_LIQUID_SYMBOLS: List[str] = sorted(
+    list({sym for sec in LIQUID_OPTIONS_SECTORS.values() for sym in sec["symbols"]})
+)
+
+
+@app.get("/api/scanner/universe")
+def get_scanner_universe():
+    """Returns the master list of liquid options tickers grouped by sector and total count."""
+    return {
+        "total_symbols": len(ALL_LIQUID_SYMBOLS),
+        "total_sectors": len(LIQUID_OPTIONS_SECTORS),
+        "sectors": LIQUID_OPTIONS_SECTORS,
+        "all_symbols": ALL_LIQUID_SYMBOLS,
+    }
+
+
+@app.get("/api/scanner/random")
+def get_random_universe(
+    count: int = Query(8, ge=1, le=25, description="Number of random tickers to return"),
+    category: str = Query("all", description="all, diverse, or specific sector key"),
+):
+    """Generates a randomized selection of liquid tickers for instant scanning and opportunity discovery."""
+    if category == "diverse":
+        # Pick symbols from each sector to ensure balanced multi-sector coverage
+        selected = []
+        sectors_keys = list(LIQUID_OPTIONS_SECTORS.keys())
+        random.shuffle(sectors_keys)
+        for k in sectors_keys:
+            syms = LIQUID_OPTIONS_SECTORS[k]["symbols"]
+            sample_size = min(len(syms), max(1, count // len(sectors_keys)))
+            picked = random.sample(syms, sample_size)
+            for p in picked:
+                if p not in selected:
+                    selected.append(p)
+            if len(selected) >= count:
+                break
+        if len(selected) < count:
+            remaining = [s for s in ALL_LIQUID_SYMBOLS if s not in selected]
+            if remaining:
+                selected.extend(random.sample(remaining, min(len(remaining), count - len(selected))))
+        selected = selected[:count]
+    elif category in LIQUID_OPTIONS_SECTORS:
+        pool = LIQUID_OPTIONS_SECTORS[category]["symbols"]
+        selected = random.sample(pool, min(len(pool), count))
+    else:
+        # Pick randomly from master pool of 70+ liquid symbols
+        selected = random.sample(ALL_LIQUID_SYMBOLS, min(len(ALL_LIQUID_SYMBOLS), count))
+
+    # Add sector metadata for rich frontend tooltips
+    details = []
+    for sym in selected:
+        sector_name = "US Liquid Options"
+        for sec_key, sec_data in LIQUID_OPTIONS_SECTORS.items():
+            if sym in sec_data["symbols"]:
+                sector_name = sec_data["name"]
+                break
+        details.append({"symbol": sym, "sector": sector_name})
+
+    return {
+        "count": len(selected),
+        "category": category,
+        "symbols": selected,
+        "symbols_string": ",".join(selected),
+        "details": details,
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
 
 
 @app.get("/api/scan")

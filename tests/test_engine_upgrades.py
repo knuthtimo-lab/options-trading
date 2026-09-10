@@ -266,3 +266,52 @@ def test_api_asymmetric_setups_no_attribute_error():
     data = r.json()
     assert "asymmetric_longs" in data
     assert "leaps_pmcc" in data
+
+
+def test_api_scanner_universe():
+    client = TestClient(app)
+    r = client.get("/api/scanner/universe")
+    assert r.status_code == 200
+    data = r.json()
+    assert "total_symbols" in data
+    assert data["total_symbols"] >= 50
+    assert "sectors" in data
+    assert "mega_tech" in data["sectors"]
+    assert "ai_high_beta" in data["sectors"]
+    assert "all_symbols" in data
+
+
+def test_api_scanner_random_all():
+    client = TestClient(app)
+    r = client.get("/api/scanner/random?count=8&category=all")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["count"] == 8
+    assert len(data["symbols"]) == 8
+    assert isinstance(data["symbols_string"], str)
+    assert len(data["symbols_string"].split(",")) == 8
+    assert len(data["details"]) == 8
+    assert "sector" in data["details"][0]
+
+
+def test_api_scanner_random_diverse():
+    client = TestClient(app)
+    r = client.get("/api/scanner/random?count=6&category=diverse")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["count"] == 6
+    assert len(data["symbols"]) == 6
+    sectors_represented = {d["sector"] for d in data["details"]}
+    # Diverse should draw from multiple sectors
+    assert len(sectors_represented) >= 3
+
+
+def test_api_scanner_random_specific_sector():
+    client = TestClient(app)
+    r = client.get("/api/scanner/random?count=5&category=healthcare_bio")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["count"] == 5
+    for item in data["details"]:
+        assert item["sector"] == "Healthcare & Pharma"
+
