@@ -146,14 +146,18 @@
         <div class="grid grid-cols-1 md:grid-cols-7 gap-3.5 items-end">
           <div class="md:col-span-2">
             <div class="flex justify-between items-center mb-1.5">
-              <label class="block text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Tickers zum Scannen</label>
+              <div class="flex items-center gap-1.5">
+                <label class="block text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Tickers zum Scannen</label>
+                <span id="scanner-universe-badge" class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/30">8 Ticker</span>
+              </div>
               <button onclick="rollRandomTickers('filter-symbols', fetchSignals)" title="Zufällige Ticker aus 70+ US-Liquiditätspool würfeln" class="text-[11px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 bg-amber-950/40 border border-amber-800/60 px-2 py-0.5 rounded hover:bg-amber-900/50 transition shadow-sm">
                 <span>🎲 8 Zufalls-Ticker</span>
               </button>
             </div>
-            <input type="text" id="filter-symbols" value="SPY,QQQ,AAPL,NVDA,TSLA,AMD,META,MSFT" 
-                   oninput="try{localStorage.setItem('saved_filter-symbols', this.value.trim().toUpperCase())}catch(e){}"
-                   onkeydown="if(event.key === 'Enter') fetchSignals(true)"
+            <input type="text" id="filter-symbols" value="" 
+                   placeholder="Z.B. AAPL,NVDA,TSLA oder 'Zufall' eingeben..."
+                   oninput="handleSymbolsInput(this)"
+                   onkeydown="if(event.key === 'Enter') handleSymbolsEnter(this)"
                    class="w-full bg-darkbg border border-cardborder rounded-xl px-3.5 py-2 text-xs text-white font-mono focus:outline-none focus:border-sky-500 transition shadow-inner">
           </div>
           <div>
@@ -1999,6 +2003,7 @@
     // ==============================================================
     const FALLBACK_LIQUID_POOLS = {
       all: ['SPY','QQQ','AAPL','NVDA','TSLA','AMD','META','MSFT','AMZN','GOOGL','PLTR','COIN','MSTR','HOOD','SMCI','ARM','AVGO','JPM','GS','XOM','CAT','LLY','UNH','NFLX','DIS','GLD','SLV','TLT'],
+      diverse: ['NVDA','JPM','GLD','LLY','AMZN','XOM','DIS','COIN','MSFT','CAT','TLT','PLTR','COST','AAPL','SLV','GS','UNH','ARM'],
       mega_tech: ['AAPL','MSFT','NVDA','AMZN','GOOGL','META','TSLA','AMD','AVGO','ORCL','CRM','NOW'],
       ai_high_beta: ['PLTR','ARM','SMCI','COIN','MSTR','HOOD','SOFI','CRWD','SNOW','NET','PANW'],
       etfs_commodities: ['SPY','QQQ','IWM','DIA','SMH','XLE','XLF','XLK','GLD','SLV','GDX','TLT'],
@@ -2007,15 +2012,70 @@
       healthcare_bio: ['LLY','UNH','JNJ','PFE','ABBV','MRK','AMGN','BMY','ISRG','GILD']
     };
 
+    let currentScannerSymbols = '';
+    let isRandomUniverse = false;
+
+    function shuffleArray(arr) {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function updateUniverseBadge(symbols, isRandom) {
+      const badge = document.getElementById('scanner-universe-badge');
+      if (!badge) return;
+      if (isRandom) {
+        badge.innerText = '🎲 8 Zufalls-Ticker';
+        badge.className = 'text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold';
+      } else {
+        const count = symbols ? symbols.split(',').filter(s => s.trim()).length : 0;
+        badge.innerText = `${count} Ticker`;
+        badge.className = 'text-[10px] font-mono px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/30';
+      }
+    }
+
+    function handleSymbolsInput(input) {
+      const val = input.value.trim();
+      if (!val) return;
+      if (/^(zufall|random|rand|mix|dice|\?)$/i.test(val)) {
+        return;
+      }
+      currentScannerSymbols = val.toUpperCase();
+      isRandomUniverse = false;
+      try { localStorage.setItem('saved_filter-symbols', currentScannerSymbols); } catch(e) {}
+      try { sessionStorage.setItem('saved_filter-symbols', currentScannerSymbols); } catch(e) {}
+      updateUniverseBadge(currentScannerSymbols, false);
+    }
+
+    function handleSymbolsEnter(input) {
+      const val = input.value.trim();
+      if (/^(zufall|random|rand|mix|dice|\?)$/i.test(val)) {
+        rollRandomTickers('filter-symbols', fetchSignals);
+      } else {
+        fetchSignals(true);
+      }
+    }
+
     function setScannerUniverse(symbols, autoScan = true) {
+      currentScannerSymbols = symbols;
+      isRandomUniverse = false;
       const input = document.getElementById('filter-symbols');
-      if (input) {
-        input.value = symbols;
-        try { localStorage.setItem('saved_filter-symbols', symbols); } catch(e) {}
-        showDiscoveryToast(`Universum gewählt: ${symbols}`);
-        if (autoScan) {
-          fetchSignals(true);
-        }
+      if (input) input.value = symbols;
+      try { localStorage.setItem('saved_filter-symbols', symbols); } catch(e) {}
+      try { sessionStorage.setItem('saved_filter-symbols', symbols); } catch(e) {}
+      try {
+        const url = new URL(window.location);
+        url.searchParams.set('symbols', symbols);
+        url.searchParams.delete('universe');
+        window.history.replaceState({}, '', url);
+      } catch(e) {}
+      updateUniverseBadge(symbols, false);
+      showDiscoveryToast(`Universum gewählt: ${symbols}`);
+      if (autoScan) {
+        fetchSignals(true, symbols);
       }
     }
 
@@ -2045,30 +2105,55 @@
 
     async function rollRandomTickers(targetInputId, scanCallback, category = 'all') {
       const input = document.getElementById(targetInputId);
-      if (!input) return;
+      
+      const badge = document.getElementById('scanner-universe-badge');
+      if (badge && targetInputId === 'filter-symbols') {
+        badge.innerText = '🎲 Würfeln...';
+        badge.className = 'text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse';
+      }
 
+      let chosenSymbols = '';
       try {
         const res = await fetch(`/api/scanner/random?count=8&category=${category}`);
         if (res.ok) {
           const data = await res.json();
-          input.value = data.symbols_string;
-          try { localStorage.setItem('saved_' + targetInputId, data.symbols_string); } catch(e) {}
-          showDiscoveryToast(`🎲 8 Zufalls-Ticker ausgewählt: ${data.symbols_string}`);
-          if (scanCallback) scanCallback(true);
-          return;
+          chosenSymbols = data.symbols_string;
         }
       } catch (e) {
         console.warn('API random fallback to local client pool', e);
       }
 
-      // Client-side fallback
-      const pool = FALLBACK_LIQUID_POOLS[category] || FALLBACK_LIQUID_POOLS.all;
-      const shuffled = [...pool].sort(() => 0.5 - Math.random());
-      const selected = shuffled.slice(0, 8);
-      input.value = selected.join(',');
-      try { localStorage.setItem('saved_' + targetInputId, input.value); } catch(e) {}
-      showDiscoveryToast(`🎲 8 Zufalls-Ticker ausgewählt: ${input.value}`);
-      if (scanCallback) scanCallback(true);
+      if (!chosenSymbols) {
+        const pool = FALLBACK_LIQUID_POOLS[category] || FALLBACK_LIQUID_POOLS.all;
+        const shuffled = shuffleArray(pool);
+        chosenSymbols = shuffled.slice(0, 8).join(',');
+      }
+
+      if (input) {
+        input.value = chosenSymbols;
+      }
+      
+      if (targetInputId === 'filter-symbols') {
+        currentScannerSymbols = chosenSymbols;
+        isRandomUniverse = true;
+        try { localStorage.setItem('saved_filter-symbols', chosenSymbols); } catch(e) {}
+        try { sessionStorage.setItem('saved_filter-symbols', chosenSymbols); } catch(e) {}
+        try {
+          const url = new URL(window.location);
+          url.searchParams.set('symbols', chosenSymbols);
+          url.searchParams.set('universe', 'random');
+          window.history.replaceState({}, '', url);
+        } catch(e) {}
+        updateUniverseBadge(chosenSymbols, true);
+      } else {
+        try { localStorage.setItem('saved_' + targetInputId, chosenSymbols); } catch(e) {}
+        try { sessionStorage.setItem('saved_' + targetInputId, chosenSymbols); } catch(e) {}
+      }
+
+      showDiscoveryToast(`🎲 8 Zufalls-Ticker ausgewählt: ${chosenSymbols}`);
+      if (scanCallback) {
+        scanCallback(true, chosenSymbols);
+      }
     }
 
     function showDiscoveryToast(msg) {
@@ -2089,19 +2174,57 @@
       }, 4000);
     }
 
-    async function fetchSignals(showFullLoader = false) {
-      let symbolsInput = document.getElementById('filter-symbols');
-      let symbols = symbolsInput ? symbolsInput.value.trim() : '';
+    async function fetchSignals(showFullLoader = false, explicitSymbols = null) {
+      let symbols = explicitSymbols;
+      const symbolsInput = document.getElementById('filter-symbols');
+
       if (!symbols) {
-        try {
-          symbols = localStorage.getItem('saved_filter-symbols') || 'SPY,QQQ,AAPL,NVDA,TSLA,AMD,META,MSFT';
-          if (symbolsInput) symbolsInput.value = symbols;
-        } catch(e) {
-          symbols = 'SPY,QQQ,AAPL,NVDA,TSLA,AMD,META,MSFT';
+        if (symbolsInput && symbolsInput.value.trim()) {
+          const val = symbolsInput.value.trim();
+          if (/^(zufall|random|rand|mix|dice|\?)$/i.test(val)) {
+            rollRandomTickers('filter-symbols', fetchSignals);
+            return;
+          }
+          symbols = val;
+        } else if (currentScannerSymbols) {
+          symbols = currentScannerSymbols;
+        } else {
+          try {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('symbols')) {
+              symbols = urlParams.get('symbols').trim();
+              if (urlParams.get('universe') === 'random') isRandomUniverse = true;
+            }
+          } catch(e) {}
+
+          if (!symbols) {
+            try {
+              symbols = sessionStorage.getItem('saved_filter-symbols') || localStorage.getItem('saved_filter-symbols');
+            } catch(e) {}
+          }
+          
+          if (!symbols) {
+            symbols = 'SPY,QQQ,AAPL,NVDA,TSLA,AMD,META,MSFT';
+          }
         }
-      } else {
-        try { localStorage.setItem('saved_filter-symbols', symbols); } catch(e) {}
       }
+
+      symbols = symbols.toUpperCase();
+      currentScannerSymbols = symbols;
+      if (symbolsInput) symbolsInput.value = symbols;
+
+      try { localStorage.setItem('saved_filter-symbols', symbols); } catch(e) {}
+      try { sessionStorage.setItem('saved_filter-symbols', symbols); } catch(e) {}
+      try {
+        const url = new URL(window.location);
+        url.searchParams.set('symbols', symbols);
+        if (isRandomUniverse) url.searchParams.set('universe', 'random');
+        else url.searchParams.delete('universe');
+        window.history.replaceState({}, '', url);
+      } catch(e) {}
+
+      updateUniverseBadge(symbols, isRandomUniverse);
+
       const action = document.getElementById('filter-action').value;
       const minConf = document.getElementById('filter-conf').value;
       const minPop = document.getElementById('filter-pop').value;
@@ -3607,7 +3730,7 @@
     function triggerRefresh() {
       updateMacro();
       if (activeTab === 'scanner') {
-        fetchSignals(false);
+        fetchSignals(false, currentScannerSymbols || (document.getElementById('filter-symbols') ? document.getElementById('filter-symbols').value : null));
       } else if (activeTab === 'curated') {
         if (typeof loadCuratedSetups === 'function') loadCuratedSetups(false);
       } else if (activeTab === 'asymmetric') {
@@ -3638,13 +3761,36 @@
     document.addEventListener('DOMContentLoaded', () => {
       lucide.createIcons();
       
-      // Restore saved universe / random tickers from localStorage if available
+      // Determine initial symbols for scanner with multi-tier persistence (URL -> Session -> Local -> Default)
+      let initialSymbols = null;
       try {
-        const savedScanner = localStorage.getItem('saved_filter-symbols');
-        if (savedScanner) {
-          const filterInput = document.getElementById('filter-symbols');
-          if (filterInput) filterInput.value = savedScanner;
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('symbols')) {
+          initialSymbols = urlParams.get('symbols').trim();
+          if (urlParams.get('universe') === 'random') {
+            isRandomUniverse = true;
+          }
         }
+      } catch(e) {}
+
+      if (!initialSymbols) {
+        try {
+          initialSymbols = sessionStorage.getItem('saved_filter-symbols') || localStorage.getItem('saved_filter-symbols');
+        } catch(e) {}
+      }
+
+      const filterInput = document.getElementById('filter-symbols');
+      if (initialSymbols) {
+        currentScannerSymbols = initialSymbols.toUpperCase();
+        if (filterInput) filterInput.value = currentScannerSymbols;
+      } else {
+        currentScannerSymbols = 'SPY,QQQ,AAPL,NVDA,TSLA,AMD,META,MSFT';
+        if (filterInput) filterInput.value = currentScannerSymbols;
+      }
+      updateUniverseBadge(currentScannerSymbols, isRandomUniverse);
+
+      // Restore other tabs
+      try {
         const savedCurated = localStorage.getItem('saved_curated-symbols-input');
         if (savedCurated) {
           const curatedInput = document.getElementById('curated-symbols-input');
@@ -3660,7 +3806,7 @@
       }
 
       updateMacro();
-      fetchSignals(true);
+      fetchSignals(true, currentScannerSymbols);
       checkAiConfig();
     });
   </script>

@@ -130,11 +130,18 @@ if STATIC_DIR.exists():
 
 @app.get("/", response_class=HTMLResponse)
 def index():
-    """Serves the main interactive dashboard."""
+    """Serves the main interactive dashboard with anti-caching headers."""
     index_file = TEMPLATES_DIR / "index.html"
     if not index_file.exists():
         raise HTTPException(status_code=404, detail="Dashboard template not found.")
-    return HTMLResponse(content=index_file.read_text(encoding="utf-8"))
+    return HTMLResponse(
+        content=index_file.read_text(encoding="utf-8"),
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
 
 
 @app.get("/api/macro")
