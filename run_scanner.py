@@ -1,4 +1,4 @@
-﻿"""
+"""
 Run Scanner Entrypoint
 Executes real-time options scanning for top tickers and outputs trade recommendations.
 Usage:

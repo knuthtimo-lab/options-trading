@@ -1,4 +1,4 @@
-﻿"""
+"""
 Historical Data Provider & Cache
 Downloads multi-year daily history for symbols and VIX,
 computes technical indicators and volatility metrics, and caches locally to parquet/csv.

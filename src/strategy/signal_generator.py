@@ -1,4 +1,4 @@
-﻿"""
+"""
 Signal Generator Engine
 Integrates Live Data, Dealer Greeks, Regime Detection, and Spread Selection
 into a unified signal pipeline.

@@ -1,4 +1,4 @@
-﻿import pandas as pd
+import pandas as pd
 from test_backtest_run import trades
 
 df = pd.DataFrame(trades)

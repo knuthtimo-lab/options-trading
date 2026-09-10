@@ -1,4 +1,4 @@
-﻿"""
+"""
 Global Configuration for Options Trading System
 """
 

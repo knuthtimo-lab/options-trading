@@ -1,4 +1,4 @@
-﻿"""
+"""
 Run Quantitative Backtest
 Executes multi-asset backtest with Master Model configuration,
 saves equity curve chart, and exports trade logs.

@@ -1,4 +1,4 @@
-﻿# Quantitative Options Trading Bot (Gamma, Vanna & Dealer Positioning Engine)
+# Quantitative Options Trading Bot (Gamma, Vanna & Dealer Positioning Engine)
 
 Ein vollständig implementiertes, mathematisch fundiertes Options-Handelssystem in Python. Das System nutzt **höhere Griechen (Greeks 2. Ordnung wie Vanna, Charm, Volga)** und **Market Maker Exposure (Net GEX & Net VEX)**, um systematisch zu entscheiden:
 1. **Wann Optionen VERKAUFT werden (Option Selling: Defined-Risk Credit Spreads / Iron Condors)** – zum systematischen Einsammeln der Volatilitätsrisikoprämie (VRP) bei hoher Trefferquote (70–85 %).

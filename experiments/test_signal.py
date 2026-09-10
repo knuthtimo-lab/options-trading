@@ -1,4 +1,4 @@
-﻿from src.strategy.signal_generator import SignalGenerator
+from src.strategy.signal_generator import SignalGenerator
 
 sig = SignalGenerator.analyze_ticker("SPY")
 if sig and sig.trade:

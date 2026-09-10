@@ -1,4 +1,4 @@
-﻿"""
+"""
 Optimization & Refinement Engine
 Runs systematic parameter optimization across:
 - Strategy mix: Pure Selling vs Selling + Dynamic Hedging vs Directional Spreads

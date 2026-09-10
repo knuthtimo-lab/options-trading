@@ -1,4 +1,4 @@
-﻿"""
+"""
 Run Web Dashboard Server
 Usage:
     python run_web.py

@@ -1,4 +1,4 @@
-﻿"""
+"""
 Institutional Quant Options Portfolio Backtester
 Combines:
 1. Dynamic Regime Switching:

@@ -1,4 +1,4 @@
-﻿"""
+"""
 Dealer Greeks & Market Maker Exposure Engine
 Calculates:
 - Net Gamma Exposure (GEX) in Dollar per 1% move

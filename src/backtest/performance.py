@@ -1,4 +1,4 @@
-﻿"""
+"""
 Performance & Risk Metrics Calculator
 Calculates CAGR, Sharpe Ratio, Sortino Ratio, Max Drawdown, Win Rate, Profit Factor,
 and generate summary reports.

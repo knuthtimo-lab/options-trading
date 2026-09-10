@@ -1,4 +1,4 @@
-﻿"""
+"""
 Spread & Option Contract Selector
 Selects specific optimal strikes, expirations, DTE, limit prices,
 and profit/stop targets based on quantitative criteria:

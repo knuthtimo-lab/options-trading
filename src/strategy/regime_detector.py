@@ -1,4 +1,4 @@
-﻿"""
+"""
 Market Regime Detector
 Determines whether market conditions favor OPTION SELLING (Credit Spreads/Iron Condors)
 or OPTION BUYING (Leveraged Long Calls/Puts/Debit Spreads) based on:

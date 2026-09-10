@@ -1,4 +1,4 @@
-﻿"""
+"""
 Black-Scholes-Merton Analytical Engine
 Calculates:
 - Option Prices (Call, Put)

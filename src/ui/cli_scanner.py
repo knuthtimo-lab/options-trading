@@ -1,4 +1,4 @@
-﻿"""
+"""
 Interactive Quantitative Options Scanner & Dashboard (Rich UI)
 Scans live options chains, computes Dealer Greeks (Net GEX, VEX, Gamma Walls),
 and outputs actionable BUY vs. SELL trade setups with exact strikes and pricing.

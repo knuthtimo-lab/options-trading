@@ -1,4 +1,4 @@
-﻿from src.data.historical_feed import HistoricalDataFeed
+from src.data.historical_feed import HistoricalDataFeed
 from src.backtest.simulator import OptionsBacktester, BacktestConfig
 
 feed = HistoricalDataFeed(cache_dir="data_cache")

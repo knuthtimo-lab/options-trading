@@ -1,4 +1,4 @@
-﻿from src.data.historical_feed import HistoricalDataFeed
+from src.data.historical_feed import HistoricalDataFeed
 from src.backtest.simulator import OptionsBacktester, BacktestConfig
 
 print("Fetching historical datasets for SPY and QQQ...")

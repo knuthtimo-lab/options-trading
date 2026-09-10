@@ -1,4 +1,4 @@
-﻿"""
+"""
 FastAPI Server for Quantitative Options Trading & Greeks Scanner
 Provides REST API endpoints and serves the Web Dashboard.
 """

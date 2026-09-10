@@ -1,4 +1,4 @@
-﻿"""
+"""
 Live Options Data Feed
 Pulls live/delayed market data and full options chains via yfinance.
 Cleans data, computes IV Rank / IV Percentile, and computes realized volatility.
