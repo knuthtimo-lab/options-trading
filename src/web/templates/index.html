@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Quant Options Dashboard & Live Greeks Scanner</title>
+  <title>Quant Options Dashboard & Live Greeks Scanner 2.0</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -24,6 +24,7 @@
     }
   </script>
   <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: #0B0F19; }
@@ -33,7 +34,8 @@
 </head>
 <body class="bg-darkbg text-gray-100 font-sans min-h-screen flex flex-col antialiased">
 
-  <header class="border-b border-cardborder bg-cardbg/80 backdrop-blur sticky top-0 z-50">
+  <!-- HEADER & MACRO TICKER -->
+  <header class="border-b border-cardborder bg-cardbg/80 backdrop-blur sticky top-0 z-40">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
       <div class="flex items-center space-x-3">
         <div class="bg-gradient-to-tr from-accentgreen to-accentcyan p-2 rounded-lg text-black font-black">
@@ -50,9 +52,9 @@
 
       <div class="flex items-center space-x-4">
         <div class="hidden md:flex items-center space-x-3 bg-darkbg/70 px-3 py-1.5 rounded-lg border border-cardborder text-xs">
-          <div><span class="text-gray-400">VIX:</span> <span id="macro-vix" class="font-bold text-accentyellow font-mono">16.58</span></div>
+          <div><span class="text-gray-400">VIX:</span> <span id="macro-vix" class="font-bold text-accentyellow font-mono">--.--</span></div>
           <span class="text-gray-600">|</span>
-          <div><span class="text-gray-400">SPY:</span> <span id="macro-spy" class="font-bold text-accentgreen font-mono">$762.40</span></div>
+          <div><span class="text-gray-400">SPY:</span> <span id="macro-spy" class="font-bold text-accentgreen font-mono">$---.--</span></div>
           <span class="text-gray-600">|</span>
           <div class="flex items-center gap-1">
             <span class="w-2 h-2 rounded-full bg-accentgreen animate-pulse"></span>
@@ -75,6 +77,7 @@
       </div>
     </div>
 
+    <!-- NAVIGATION TABS -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-8 text-sm">
       <button onclick="switchTab('scanner')" id="tab-btn-scanner" class="py-2.5 border-b-2 border-accentcyan text-accentcyan font-medium flex items-center gap-2">
         <i data-lucide="radar" class="w-4 h-4"></i> Live Scanner & Setups
@@ -82,18 +85,25 @@
       <button onclick="switchTab('chain')" id="tab-btn-chain" class="py-2.5 border-b-2 border-transparent text-gray-400 hover:text-gray-200 font-medium flex items-center gap-2">
         <i data-lucide="layers" class="w-4 h-4"></i> Options Chain & Greeks 2.0
       </button>
+      <button onclick="switchTab('paper')" id="tab-btn-paper" class="py-2.5 border-b-2 border-transparent text-gray-400 hover:text-gray-200 font-medium flex items-center gap-2">
+        <i data-lucide="wallet" class="w-4 h-4"></i> Paper Portfolio
+        <span id="paper-badge" class="bg-accentcyan/20 text-accentcyan text-[10px] px-1.5 py-0.5 rounded-full font-mono">0</span>
+      </button>
       <button onclick="switchTab('backtest')" id="tab-btn-backtest" class="py-2.5 border-b-2 border-transparent text-gray-400 hover:text-gray-200 font-medium flex items-center gap-2">
-        <i data-lucide="trending-up" class="w-4 h-4"></i> Master Backtest (+70.4% p.a.)
+        <i data-lucide="trending-up" class="w-4 h-4"></i> Backtest & Monte Carlo (+70.4% p.a.)
       </button>
     </div>
   </header>
 
   <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full">
 
-    <!-- TAB 1: SCANNER -->
+    <!-- ============================================================== -->
+    <!-- TAB 1: SCANNER & TRADE SETUPS                                  -->
+    <!-- ============================================================== -->
     <section id="tab-scanner" class="space-y-6">
+      <!-- Filter Bar -->
       <div class="bg-cardbg rounded-xl border border-cardborder p-4 shadow-lg">
-        <div class="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
+        <div class="grid grid-cols-1 md:grid-cols-7 gap-3 items-end">
           <div class="md:col-span-2">
             <label class="block text-xs text-gray-400 mb-1 font-medium">Tickers zum Scannen</label>
             <input type="text" id="filter-symbols" value="SPY,QQQ,AAPL,NVDA,TSLA,AMD,META,MSFT" 
@@ -105,6 +115,15 @@
               <option value="ALL">Alle (Selling & Buying)</option>
               <option value="SELL">Nur Verkaufen (Credit Spreads/Condor)</option>
               <option value="BUY">Nur Kaufen (Hebel / Debit Spreads)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1 font-medium">Min. Confidence</label>
+            <select id="filter-conf" class="w-full bg-darkbg border border-cardborder rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-accentcyan">
+              <option value="0">Alle Grades</option>
+              <option value="70">>= 70% (Grade B+)</option>
+              <option value="80" selected>>= 80% (Grade A)</option>
+              <option value="90">>= 90% (Grade A+ Exzellent)</option>
             </select>
           </div>
           <div>
@@ -134,6 +153,7 @@
         </div>
       </div>
 
+      <!-- Live Market Scanner Table -->
       <div class="bg-cardbg rounded-xl border border-cardborder overflow-hidden shadow-lg">
         <div class="px-4 py-3 border-b border-cardborder flex justify-between items-center bg-darkbg/50">
           <h2 class="text-sm font-bold text-white flex items-center gap-2">
@@ -146,6 +166,7 @@
           <table class="w-full text-left text-xs">
             <thead class="bg-darkbg text-gray-400 uppercase font-mono text-[11px] border-b border-cardborder">
               <tr>
+                <th class="px-4 py-2.5">Confidence</th>
                 <th class="px-4 py-2.5">Ticker</th>
                 <th class="px-4 py-2.5">Kurs</th>
                 <th class="px-4 py-2.5">HV (30d)</th>
@@ -155,26 +176,29 @@
                 <th class="px-4 py-2.5">Put/Call Wall</th>
                 <th class="px-4 py-2.5">Empfehlung</th>
                 <th class="px-4 py-2.5">POP / ROC</th>
-                <th class="px-4 py-2.5">Aktion</th>
+                <th class="px-4 py-2.5 text-center">Aktionen</th>
               </tr>
             </thead>
             <tbody id="scanner-table-body" class="divide-y divide-cardborder/50 text-gray-200">
-              <tr><td colspan="10" class="text-center py-8 text-gray-500">Lade Live-Optionsketten...</td></tr>
+              <tr><td colspan="11" class="text-center py-8 text-gray-500">Lade Live-Optionsketten...</td></tr>
             </tbody>
           </table>
         </div>
       </div>
 
+      <!-- Trade Cards Grid -->
       <div>
         <h3 class="text-sm font-bold text-white mb-3 flex items-center gap-2">
           <i data-lucide="zap" class="w-4 h-4 text-accentgreen"></i>
-          Detaillierte Handels-Setups (Exact Strikes, DTE, Limitpreise & Greeks)
+          Detaillierte Handels-Setups (Exact Strikes, DTE, Limitpreise, Greeks & Sizing)
         </h3>
         <div id="trade-cards-grid" class="grid grid-cols-1 lg:grid-cols-2 gap-4"></div>
       </div>
     </section>
 
-    <!-- TAB 2: OPTIONS CHAIN -->
+    <!-- ============================================================== -->
+    <!-- TAB 2: OPTIONS CHAIN & GREEKS 2.0                              -->
+    <!-- ============================================================== -->
     <section id="tab-chain" class="space-y-4 hidden">
       <div class="bg-cardbg rounded-xl border border-cardborder p-4 shadow-lg flex flex-wrap gap-4 items-center justify-between">
         <div class="flex items-center space-x-3">
@@ -236,7 +260,106 @@
       </div>
     </section>
 
-    <!-- TAB 3: BACKTEST -->
+    <!-- ============================================================== -->
+    <!-- TAB 3: VIRTUAL PAPER PORTFOLIO                                 -->
+    <!-- ============================================================== -->
+    <section id="tab-paper" class="space-y-6 hidden">
+      <!-- Paper Portfolio Metrics -->
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div class="bg-cardbg border border-cardborder p-4 rounded-xl">
+          <div class="text-xs text-gray-400">Gesamtkapital (Balance)</div>
+          <div id="paper-balance" class="text-2xl font-bold font-mono text-white mt-1">$25.000,00</div>
+          <div class="text-[11px] text-gray-500 mt-1">Startkapital: $25.000</div>
+        </div>
+        <div class="bg-cardbg border border-cardborder p-4 rounded-xl">
+          <div class="text-xs text-gray-400">Verfügbares Cash</div>
+          <div id="paper-cash" class="text-2xl font-bold font-mono text-accentcyan mt-1">$25.000,00</div>
+          <div class="text-[11px] text-gray-500 mt-1">Liquidität für Trades</div>
+        </div>
+        <div class="bg-cardbg border border-cardborder p-4 rounded-xl">
+          <div class="text-xs text-gray-400">Gebundene Margin</div>
+          <div id="paper-margin" class="text-2xl font-bold font-mono text-accentyellow mt-1">$0,00</div>
+          <div class="text-[11px] text-gray-500 mt-1">Aktive Risiko-Exposition</div>
+        </div>
+        <div class="bg-cardbg border border-cardborder p-4 rounded-xl">
+          <div class="text-xs text-gray-400">Realisierter PnL</div>
+          <div id="paper-realized-pnl" class="text-2xl font-bold font-mono text-accentgreen mt-1">+$0,00</div>
+          <div id="paper-winrate" class="text-[11px] text-gray-400 mt-1">Win Rate: 0.0% (0 Trades)</div>
+        </div>
+        <div class="bg-cardbg border border-cardborder p-4 rounded-xl">
+          <div class="text-xs text-gray-400">Offene Positionen</div>
+          <div id="paper-open-count" class="text-2xl font-bold font-mono text-white mt-1">0</div>
+          <div class="text-[11px] text-gray-500 mt-1">Live überwacht</div>
+        </div>
+      </div>
+
+      <!-- Active Paper Positions -->
+      <div class="bg-cardbg rounded-xl border border-cardborder overflow-hidden shadow-lg">
+        <div class="px-4 py-3 border-b border-cardborder flex justify-between items-center bg-darkbg/50">
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i data-lucide="briefcase" class="w-4 h-4 text-accentcyan"></i>
+            Aktive Positionen im Paper Trading Depot
+          </h3>
+          <button onclick="loadPaperPortfolio()" class="text-xs text-gray-400 hover:text-white flex items-center gap-1">
+            <i data-lucide="refresh-cw" class="w-3 h-3"></i> Aktualisieren
+          </button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs font-mono">
+            <thead class="bg-darkbg text-gray-400 uppercase text-[11px] border-b border-cardborder">
+              <tr>
+                <th class="px-4 py-2.5">ID</th>
+                <th class="px-4 py-2.5">Symbol</th>
+                <th class="px-4 py-2.5">Strategie</th>
+                <th class="px-4 py-2.5">Legs</th>
+                <th class="px-4 py-2.5">Einstieg</th>
+                <th class="px-4 py-2.5">Kontrakte</th>
+                <th class="px-4 py-2.5">Max Profit / Loss</th>
+                <th class="px-4 py-2.5">Target TP / SL</th>
+                <th class="px-4 py-2.5 text-center">Aktion</th>
+              </tr>
+            </thead>
+            <tbody id="paper-positions-body" class="divide-y divide-cardborder/40 text-gray-200">
+              <tr><td colspan="9" class="text-center py-6 text-gray-500">Keine offenen Positionen. Öffne Trades aus dem Scanner!</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Closed Paper Trades -->
+      <div class="bg-cardbg rounded-xl border border-cardborder overflow-hidden shadow-lg">
+        <div class="px-4 py-3 border-b border-cardborder flex justify-between items-center bg-darkbg/50">
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i data-lucide="check-circle" class="w-4 h-4 text-accentgreen"></i>
+            Geschlossene Paper Trades Historie
+          </h3>
+          <span id="paper-closed-count" class="text-xs text-gray-400">0 geschlossene Trades</span>
+        </div>
+        <div class="overflow-x-auto max-h-[300px]">
+          <table class="w-full text-left text-xs font-mono">
+            <thead class="bg-darkbg text-gray-400 uppercase text-[11px] border-b border-cardborder sticky top-0">
+              <tr>
+                <th class="px-4 py-2">ID</th>
+                <th class="px-4 py-2">Symbol</th>
+                <th class="px-4 py-2">Strategie</th>
+                <th class="px-4 py-2">Einstieg &rarr; Ausstieg</th>
+                <th class="px-4 py-2">Einstiegspreis</th>
+                <th class="px-4 py-2">Ausstiegspreis</th>
+                <th class="px-4 py-2 text-right">Realisierter PnL</th>
+                <th class="px-4 py-2">Schließungsgrund</th>
+              </tr>
+            </thead>
+            <tbody id="paper-closed-body" class="divide-y divide-cardborder/40 text-gray-200">
+              <tr><td colspan="8" class="text-center py-6 text-gray-500">Noch keine Trades geschlossen.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- TAB 4: BACKTEST & MONTE CARLO                                  -->
+    <!-- ============================================================== -->
     <section id="tab-backtest" class="space-y-6 hidden">
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div class="bg-cardbg border border-cardborder p-4 rounded-xl">
@@ -258,6 +381,45 @@
           <div class="text-xs text-gray-400">Sharpe Ratio / Profit Factor</div>
           <div class="text-2xl font-bold font-mono text-accentyellow mt-1">1,25 / 1,40</div>
           <div class="text-[11px] text-gray-500 mt-1">Ø Haltedauer: 8,3 Tage</div>
+        </div>
+      </div>
+
+      <!-- MONTE CARLO SIMULATION FAN CHART SECTION -->
+      <div class="bg-cardbg border border-cardborder rounded-xl p-5 shadow-lg space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-cardborder pb-3">
+          <div>
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i data-lucide="shuffle" class="w-4 h-4 text-purple-400"></i>
+              1.000-Pfad Monte Carlo Robustheits-Analyse (Bootstrap Resampling)
+            </h3>
+            <p class="text-xs text-gray-400 mt-0.5">Zufällige Permutationen der realisierten Trades zur Überprüfung von statistischer Robustheit & Sequenz-Risiko</p>
+          </div>
+          <button onclick="loadMonteCarlo()" class="bg-purple-950/40 hover:bg-purple-900/50 text-purple-300 border border-purple-700/50 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition">
+            <i data-lucide="play" class="w-3 h-3"></i> Simulation Neu Starten
+          </button>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs font-mono">
+          <div class="bg-darkbg/70 p-3 rounded-lg border border-cardborder">
+            <span class="text-gray-400 block text-[10px]">5. PERZENTIL (WORST CASE)</span>
+            <span id="mc-p5" class="text-yellow-400 font-bold text-base">--% p.a.</span>
+          </div>
+          <div class="bg-darkbg/70 p-3 rounded-lg border border-cardborder">
+            <span class="text-gray-400 block text-[10px]">50. PERZENTIL (MEDIAN ERWARTUNG)</span>
+            <span id="mc-p50" class="text-accentgreen font-bold text-base">--% p.a.</span>
+          </div>
+          <div class="bg-darkbg/70 p-3 rounded-lg border border-cardborder">
+            <span class="text-gray-400 block text-[10px]">95. PERZENTIL (BEST CASE)</span>
+            <span id="mc-p95" class="text-accentcyan font-bold text-base">--% p.a.</span>
+          </div>
+          <div class="bg-darkbg/70 p-3 rounded-lg border border-cardborder">
+            <span class="text-gray-400 block text-[10px]">PROB. CAGR &gt; 50%</span>
+            <span id="mc-prob-50" class="text-emerald-400 font-bold text-base">--%</span>
+          </div>
+        </div>
+
+        <div class="relative h-72 w-full bg-darkbg/50 p-2 rounded-lg border border-cardborder">
+          <canvas id="mcChart"></canvas>
         </div>
       </div>
 
@@ -307,13 +469,137 @@
 
   </main>
 
+  <!-- ============================================================== -->
+  <!-- MODAL 1: INTERACTIVE PAYOFF DIAGRAM                            -->
+  <!-- ============================================================== -->
+  <div id="payoff-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-cardbg border border-cardborder rounded-2xl w-full max-w-4xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-cardborder pb-3">
+        <div>
+          <h3 id="payoff-title" class="text-lg font-bold text-white flex items-center gap-2">
+            <i data-lucide="line-chart" class="w-5 h-5 text-accentcyan"></i>
+            Mark-to-Market & Expiration Payoff Diagramm
+          </h3>
+          <p id="payoff-subtitle" class="text-xs text-gray-400 font-mono mt-0.5">--</p>
+        </div>
+        <button onclick="closePayoffModal()" class="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Key Payoff Metrics Row -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs font-mono">
+        <div class="bg-darkbg/80 p-3 rounded-lg border border-cardborder">
+          <span class="text-gray-400 block text-[10px]">MAXIMALER GEWINN</span>
+          <span id="payoff-max-profit" class="text-accentgreen font-bold text-base">+$0.00</span>
+        </div>
+        <div class="bg-darkbg/80 p-3 rounded-lg border border-cardborder">
+          <span class="text-gray-400 block text-[10px]">MAXIMALER VERLUST</span>
+          <span id="payoff-max-loss" class="text-accentred font-bold text-base">-$0.00</span>
+        </div>
+        <div class="bg-darkbg/80 p-3 rounded-lg border border-cardborder">
+          <span class="text-gray-400 block text-[10px]">BREAKEVEN KURS</span>
+          <span id="payoff-breakeven" class="text-accentyellow font-bold text-base">$0.00</span>
+        </div>
+        <div class="bg-darkbg/80 p-3 rounded-lg border border-cardborder">
+          <span class="text-gray-400 block text-[10px]">CHANCE-RISIKO (R/R)</span>
+          <span id="payoff-rr" class="text-accentcyan font-bold text-base">0.00</span>
+        </div>
+      </div>
+
+      <!-- Chart Container -->
+      <div class="relative h-80 w-full bg-darkbg p-3 rounded-xl border border-cardborder">
+        <canvas id="payoffChart"></canvas>
+      </div>
+
+      <div class="flex justify-between items-center text-xs text-gray-400 pt-2 border-t border-cardborder">
+        <div class="flex items-center gap-4">
+          <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 bg-accentgreen inline-block"></span> Bei Verfall (T=0)</span>
+          <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 bg-accentcyan inline-block"></span> Heute (T=DTE)</span>
+          <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 bg-purple-400 inline-block"></span> Halbzeit (T=DTE/2)</span>
+        </div>
+        <button onclick="closePayoffModal()" class="bg-cardborder hover:bg-gray-700 text-white px-4 py-1.5 rounded-lg text-xs font-medium transition">
+          Schließen
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- MODAL 2: POSITION SIZING & PAPER TRADE                         -->
+  <!-- ============================================================== -->
+  <div id="sizing-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-cardbg border border-cardborder rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-cardborder pb-3">
+        <div>
+          <h3 class="text-lg font-bold text-white flex items-center gap-2">
+            <i data-lucide="calculator" class="w-5 h-5 text-accentgreen"></i>
+            Kelly Position Sizing & Paper Order
+          </h3>
+          <p id="sizing-subtitle" class="text-xs text-gray-400 font-mono mt-0.5">--</p>
+        </div>
+        <button onclick="closeSizingModal()" class="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-gray-400 mb-1">Risiko-Modus (Kelly Criterion)</label>
+          <select id="sizing-risk-mode" onchange="recalcSizing()" class="w-full bg-darkbg border border-cardborder rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-accentcyan">
+            <option value="HALF_KELLY" selected>Half-Kelly (Optimales Wachstum, reduzierter Drawdown)</option>
+            <option value="FIXED_2PCT">Konservativ: Maximal 2% des Kontos riskieren</option>
+            <option value="FIXED_1PCT">Ultra-Konservativ: Maximal 1% des Kontos riskieren</option>
+            <option value="FULL_KELLY">Full-Kelly (Mathematisches Maximum, hohe Schwankung)</option>
+            <option value="AGGRESSIVE_25PCT">Master-Modell Allokation (max. 25% Margin)</option>
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 font-mono">
+          <div class="bg-darkbg/70 p-3 rounded-lg border border-cardborder">
+            <span class="text-gray-400 block text-[10px]">KONTRAKTE (STÜCK)</span>
+            <input type="number" id="sizing-contracts" min="1" max="50" value="1" onchange="manualContractsChanged()"
+                   class="w-full bg-cardbg border border-cardborder rounded px-2 py-1 text-accentcyan font-bold text-base focus:outline-none focus:border-accentcyan">
+          </div>
+          <div class="bg-darkbg/70 p-3 rounded-lg border border-cardborder">
+            <span class="text-gray-400 block text-[10px]">KAPITAL IM RISIKO</span>
+            <span id="sizing-total-risk" class="text-accentred font-bold text-base block mt-1">$0.00</span>
+          </div>
+          <div class="bg-darkbg/70 p-3 rounded-lg border border-cardborder">
+            <span class="text-gray-400 block text-[10px]">GEWINNPOTENTIAL</span>
+            <span id="sizing-expected-profit" class="text-accentgreen font-bold text-base block mt-1">+$0.00</span>
+          </div>
+          <div class="bg-darkbg/70 p-3 rounded-lg border border-cardborder">
+            <span class="text-gray-400 block text-[10px]">DEPOT-RISIKO ANTEIL</span>
+            <span id="sizing-risk-pct" class="text-accentyellow font-bold text-base block mt-1">0.0%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pt-3 border-t border-cardborder flex justify-end gap-2">
+        <button onclick="closeSizingModal()" class="bg-cardborder hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-xs font-medium transition">
+          Abbrechen
+        </button>
+        <button onclick="executePaperTrade()" class="bg-gradient-to-r from-accentgreen to-emerald-600 hover:opacity-90 text-black font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-1.5 transition shadow">
+          <i data-lucide="send" class="w-3.5 h-3.5"></i>
+          <span>Im Paper Portfolio eröffnen</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT LOGIC -->
   <script>
     let activeTab = 'scanner';
     let autoRefreshTimer = null;
+    let currentTradesMap = {};
+    let activeTradeForModal = null;
+    let payoffChartInstance = null;
+    let mcChartInstance = null;
 
     function switchTab(tab) {
       activeTab = tab;
-      ['scanner', 'chain', 'backtest'].forEach(t => {
+      ['scanner', 'chain', 'paper', 'backtest'].forEach(t => {
         const sec = document.getElementById('tab-' + t);
         const btn = document.getElementById('tab-btn-' + t);
         if (t === tab) {
@@ -326,11 +612,20 @@
           btn.classList.add('border-transparent', 'text-gray-400');
         }
       });
+
       if (tab === 'chain' && document.getElementById('chain-table-body').children.length <= 1) {
         loadChain();
       }
-      if (tab === 'backtest' && document.getElementById('backtest-trades-body').children.length <= 1) {
-        loadBacktestTrades();
+      if (tab === 'paper') {
+        loadPaperPortfolio();
+      }
+      if (tab === 'backtest') {
+        if (document.getElementById('backtest-trades-body').children.length <= 1) {
+          loadBacktestTrades();
+        }
+        if (!mcChartInstance) {
+          loadMonteCarlo();
+        }
       }
     }
 
@@ -349,21 +644,23 @@
     async function fetchSignals() {
       const symbols = document.getElementById('filter-symbols').value || 'SPY,QQQ,AAPL,NVDA,TSLA';
       const action = document.getElementById('filter-action').value;
+      const minConf = document.getElementById('filter-conf').value;
       const minPop = document.getElementById('filter-pop').value;
       const minIvr = document.getElementById('filter-ivr').value;
 
       const tbody = document.getElementById('scanner-table-body');
-      tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-accentcyan animate-pulse">Scanne Live-Optionen & berechne Gamma/Vanna-Exposures...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="11" class="text-center py-8 text-accentcyan animate-pulse">Scanne Live-Optionen & berechne Gamma/Vanna-Exposures und Multi-Faktor Confidence...</td></tr>';
 
       try {
-        const url = `/api/scan?symbols=${encodeURIComponent(symbols)}&action=${action}&min_pop=${minPop}&min_iv_rank=${minIvr}`;
+        const url = `/api/scan?symbols=${encodeURIComponent(symbols)}&action=${action}&min_pop=${minPop}&min_iv_rank=${minIvr}&min_confidence=${minConf}`;
         const res = await fetch(url);
         const data = await res.json();
         
         document.getElementById('scan-count-badge').innerText = `${data.count} Signale`;
+        currentTradesMap = {};
 
         if (!data.trades || data.trades.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-gray-500">Keine Trades für die gewählten Filterkriterien gefunden.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="11" class="text-center py-8 text-gray-500">Keine Trades für die gewählten Filterkriterien gefunden.</td></tr>';
           document.getElementById('trade-cards-grid').innerHTML = '';
           return;
         }
@@ -372,6 +669,8 @@
         let htmlCards = '';
 
         data.trades.forEach(t => {
+          currentTradesMap[t.symbol] = t;
+
           const isPositiveGamma = t.gamma_regime === 'POSITIVE_GAMMA';
           const gammaBadge = isPositiveGamma 
             ? '<span class="px-2 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-800/60 font-mono text-[11px]">POSITIVE (Stab.)</span>' 
@@ -382,9 +681,19 @@
             ? '<span class="px-2 py-0.5 rounded bg-green-500/15 text-accentgreen border border-green-500/30 font-bold">SELL (Credit)</span>'
             : '<span class="px-2 py-0.5 rounded bg-cyan-500/15 text-accentcyan border border-cyan-500/30 font-bold">BUY (Hebel)</span>';
 
+          // Confidence color
+          let confColor = 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40';
+          if (t.confidence_score >= 85) confColor = 'bg-emerald-500/20 text-accentgreen border-emerald-500/40';
+          else if (t.confidence_score < 70) confColor = 'bg-gray-500/20 text-gray-400 border-gray-500/40';
+
           htmlRows += `
             <tr class="hover:bg-darkbg/60 transition">
-              <td class="px-4 py-3 font-bold text-yellow-400">${t.symbol}</td>
+              <td class="px-4 py-3">
+                <span class="px-2 py-0.5 rounded border font-mono font-bold text-xs ${confColor}">
+                  ${t.confidence_grade} (${t.confidence_score}%)
+                </span>
+              </td>
+              <td class="px-4 py-3 font-bold text-yellow-400 font-mono">${t.symbol}</td>
               <td class="px-4 py-3 font-mono">$${t.spot_price}</td>
               <td class="px-4 py-3 font-mono text-gray-400">${t.historical_vol_30d}%</td>
               <td class="px-4 py-3 font-mono ${t.iv_rank > 35 ? 'text-accentyellow font-bold' : 'text-gray-400'}">${t.iv_rank}%</td>
@@ -393,13 +702,27 @@
               <td class="px-4 py-3 font-mono text-gray-300">$${t.put_wall} / $${t.call_wall}</td>
               <td class="px-4 py-3">${actionBadge}</td>
               <td class="px-4 py-3 font-mono text-xs"><span class="text-white font-bold">${t.pop_pct}%</span> / <span class="text-accentcyan">${t.roc_pct}%</span></td>
-              <td class="px-4 py-3">
-                <button onclick="inspectChain('${t.symbol}')" class="text-xs text-accentcyan hover:underline font-mono">Chain &rarr;</button>
+              <td class="px-4 py-3 text-center">
+                <div class="flex items-center justify-center gap-1.5">
+                  <button onclick="openPayoffModal('${t.symbol}')" class="bg-accentcyan/10 hover:bg-accentcyan/25 text-accentcyan border border-accentcyan/30 px-2 py-1 rounded text-xs transition" title="Payoff Diagramm">
+                    Chart
+                  </button>
+                  <button onclick="openSizingModal('${t.symbol}')" class="bg-accentgreen/15 hover:bg-accentgreen/30 text-accentgreen border border-accentgreen/40 px-2 py-1 rounded text-xs font-bold transition" title="Order Sizing / Paper Trade">
+                    Trade
+                  </button>
+                  <button onclick="inspectChain('${t.symbol}')" class="text-gray-400 hover:text-white px-1.5 py-1 text-xs" title="Options Chain">
+                    &rarr;
+                  </button>
+                </div>
               </td>
             </tr>
           `;
 
           const borderStyle = isSell ? 'border-accentgreen/40' : 'border-accentcyan/40';
+
+          const strengthsHtml = (t.strengths || []).slice(0, 2).map(s => `<li class="text-emerald-300 flex items-center gap-1"><i data-lucide="check" class="w-3 h-3"></i> ${s}</li>`).join('');
+          const risksHtml = (t.risks || []).slice(0, 1).map(r => `<li class="text-yellow-300 flex items-center gap-1"><i data-lucide="alert-circle" class="w-3 h-3"></i> ${r}</li>`).join('');
+
           htmlCards += `
             <div class="bg-cardbg rounded-xl border ${borderStyle} p-4 shadow-lg flex flex-col justify-between">
               <div>
@@ -408,10 +731,19 @@
                     <span class="text-lg font-bold text-white">${t.symbol}</span>
                     <span class="text-xs text-gray-400 font-mono ml-2">$${t.spot_price}</span>
                   </div>
-                  <div>${actionBadge}</div>
+                  <div class="flex items-center gap-2">
+                    <span class="px-2 py-0.5 rounded border font-mono font-bold text-xs ${confColor}">
+                      Grade ${t.confidence_grade} (${t.confidence_score}%)
+                    </span>
+                    ${actionBadge}
+                  </div>
                 </div>
 
-                <div class="text-xs font-bold text-white mb-2">${t.strategy_name}</div>
+                <div class="text-xs font-bold text-white mb-2 flex items-center justify-between">
+                  <span>${t.strategy_name}</span>
+                  <span class="text-[11px] text-gray-400 font-mono">Hebel: ${t.leverage_factor}x</span>
+                </div>
+
                 <div class="bg-darkbg/80 p-2.5 rounded-lg border border-cardborder mb-3 font-mono text-xs text-yellow-300">
                   ${t.legs} (Exp: <span class="text-white">${t.expiration}</span> | <span class="text-accentcyan">${t.dte} DTE</span>)
                 </div>
@@ -438,6 +770,12 @@
                   <div class="text-gray-300">Return on Capital: <span class="text-accentcyan font-bold">${t.roc_pct}%</span></div>
                 </div>
 
+                <!-- Strengths & Risks -->
+                <ul class="text-[11px] mb-3 space-y-0.5 bg-darkbg/50 p-2 rounded border border-cardborder/50">
+                  ${strengthsHtml}
+                  ${risksHtml}
+                </ul>
+
                 <div class="flex items-center gap-3 text-[11px] font-mono border-t border-cardborder/50 pt-2 text-gray-400">
                   <div>Theta: <span class="text-accentgreen">+${t.net_theta_daily.toFixed(2)} $/Tag</span></div>
                   <div>Vanna: <span class="text-white">${t.net_vanna.toFixed(1)}</span></div>
@@ -445,8 +783,15 @@
                 </div>
               </div>
 
-              <div class="mt-3 pt-2 border-t border-cardborder text-[11px] text-gray-400 italic">
-                ${t.reasoning}
+              <div class="mt-4 pt-3 border-t border-cardborder flex items-center justify-between gap-2">
+                <button onclick="openPayoffModal('${t.symbol}')" class="flex-1 bg-accentcyan/15 hover:bg-accentcyan/25 text-accentcyan border border-accentcyan/30 py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5">
+                  <i data-lucide="line-chart" class="w-3.5 h-3.5"></i>
+                  <span>Payoff Diagramm</span>
+                </button>
+                <button onclick="openSizingModal('${t.symbol}')" class="flex-1 bg-gradient-to-r from-accentgreen to-emerald-600 hover:opacity-90 text-black py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 shadow">
+                  <i data-lucide="calculator" class="w-3.5 h-3.5"></i>
+                  <span>Kelly Sizing & Paper</span>
+                </button>
               </div>
             </div>
           `;
@@ -454,9 +799,10 @@
 
         tbody.innerHTML = htmlRows;
         document.getElementById('trade-cards-grid').innerHTML = htmlCards;
+        lucide.createIcons();
 
       } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="10" class="text-center py-8 text-red-400">Fehler beim Scannen: ${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="11" class="text-center py-8 text-red-400">Fehler beim Scannen: ${e.message}</td></tr>`;
       }
     }
 
@@ -530,6 +876,377 @@
       loadChain();
     }
 
+    // -------------------------------------------------------------
+    // PAYOFF MODAL & CHART.JS
+    // -------------------------------------------------------------
+    async function openPayoffModal(sym) {
+      const trade = currentTradesMap[sym];
+      if (!trade) return;
+
+      document.getElementById('payoff-title').innerHTML = `<i data-lucide="line-chart" class="w-5 h-5 text-accentcyan"></i> Payoff Diagramm: ${trade.symbol} (${trade.strategy_name})`;
+      document.getElementById('payoff-subtitle').innerText = `${trade.legs} | Exp: ${trade.expiration} (${trade.dte} DTE)`;
+      document.getElementById('payoff-modal').classList.remove('hidden');
+      lucide.createIcons();
+
+      try {
+        const url = `/api/payoff?strategy_name=${encodeURIComponent(trade.strategy_name)}&spot_price=${trade.spot_price}&entry_price=${trade.entry_limit_price}&short_strike=${trade.short_strike || ''}&long_strike=${trade.long_strike || ''}&dte=${trade.dte}&iv=${trade.current_iv / 100.0}&contracts=1`;
+        const res = await fetch(url);
+        const data = await res.json();
+
+        document.getElementById('payoff-max-profit').innerText = '+$' + data.max_profit.toFixed(2);
+        document.getElementById('payoff-max-loss').innerText = '-$' + data.max_loss.toFixed(2);
+        document.getElementById('payoff-breakeven').innerText = data.breakevens.map(b => '$' + b.toFixed(2)).join(', ');
+        document.getElementById('payoff-rr').innerText = data.risk_reward_ratio.toFixed(2);
+
+        renderPayoffChart(data);
+      } catch (e) {
+        console.error("Error loading payoff", e);
+      }
+    }
+
+    function closePayoffModal() {
+      document.getElementById('payoff-modal').classList.add('hidden');
+    }
+
+    function renderPayoffChart(data) {
+      const ctx = document.getElementById('payoffChart').getContext('2d');
+      if (payoffChartInstance) {
+        payoffChartInstance.destroy();
+      }
+
+      payoffChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: data.prices,
+          datasets: [
+            {
+              label: 'Verfall (T=0)',
+              data: data.pnl_expiration,
+              borderColor: '#00C805',
+              borderWidth: 2.5,
+              fill: false,
+              pointRadius: 0,
+              tension: 0.1
+            },
+            {
+              label: 'Heute (T=DTE)',
+              data: data.pnl_today,
+              borderColor: '#06B6D4',
+              borderWidth: 2,
+              borderDash: [5, 5],
+              fill: false,
+              pointRadius: 0,
+              tension: 0.3
+            },
+            {
+              label: 'Halbzeit (T=DTE/2)',
+              data: data.pnl_midway,
+              borderColor: '#A855F7',
+              borderWidth: 1.5,
+              borderDash: [3, 3],
+              fill: false,
+              pointRadius: 0,
+              tension: 0.3
+            },
+            {
+              label: 'Zero Line',
+              data: data.prices.map(() => 0),
+              borderColor: '#4B5563',
+              borderWidth: 1,
+              borderDash: [2, 2],
+              pointRadius: 0,
+              fill: false
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          scales: {
+            x: {
+              title: { display: true, text: 'Underlying Kurs ($)', color: '#9CA3AF' },
+              grid: { color: '#1F2937' },
+              ticks: { color: '#9CA3AF', maxTicksLimit: 12 }
+            },
+            y: {
+              title: { display: true, text: 'Gewinn / Verlust ($)', color: '#9CA3AF' },
+              grid: { color: '#1F2937' },
+              ticks: { color: '#9CA3AF' }
+            }
+          },
+          plugins: {
+            legend: { labels: { color: '#E5E7EB', boxWidth: 12 } }
+          }
+        }
+      });
+    }
+
+    // -------------------------------------------------------------
+    // POSITION SIZING & PAPER TRADE MODAL
+    // -------------------------------------------------------------
+    function openSizingModal(sym) {
+      const trade = currentTradesMap[sym];
+      if (!trade) return;
+      activeTradeForModal = trade;
+
+      document.getElementById('sizing-subtitle').innerText = `${trade.symbol} ${trade.strategy_name} | Max Profit: $${trade.max_profit} | Max Loss: $${trade.max_loss}`;
+      document.getElementById('sizing-modal').classList.remove('hidden');
+      recalcSizing();
+    }
+
+    function closeSizingModal() {
+      document.getElementById('sizing-modal').classList.add('hidden');
+      activeTradeForModal = null;
+    }
+
+    async function recalcSizing() {
+      if (!activeTradeForModal) return;
+      const mode = document.getElementById('sizing-risk-mode').value;
+      try {
+        const res = await fetch('/api/paper/size', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            account_equity: 25000.0,
+            risk_mode: mode,
+            max_loss: activeTradeForModal.max_loss,
+            max_profit: activeTradeForModal.max_profit,
+            win_prob_pct: activeTradeForModal.pop_pct
+          })
+        });
+        const data = await res.json();
+        document.getElementById('sizing-contracts').value = data.recommended_contracts;
+        document.getElementById('sizing-total-risk').innerText = '-$' + data.total_risk_dollar.toFixed(2);
+        document.getElementById('sizing-expected-profit').innerText = '+$' + data.expected_profit_dollar.toFixed(2);
+        document.getElementById('sizing-risk-pct').innerText = data.portfolio_risk_pct.toFixed(1) + '%';
+      } catch (e) {
+        console.error("Error calculating sizing", e);
+      }
+    }
+
+    function manualContractsChanged() {
+      if (!activeTradeForModal) return;
+      const contracts = parseInt(document.getElementById('sizing-contracts').value) || 1;
+      const totalRisk = contracts * activeTradeForModal.max_loss;
+      const totalProfit = contracts * activeTradeForModal.max_profit;
+      const riskPct = (totalRisk / 25000.0) * 100.0;
+
+      document.getElementById('sizing-total-risk').innerText = '-$' + totalRisk.toFixed(2);
+      document.getElementById('sizing-expected-profit').innerText = '+$' + totalProfit.toFixed(2);
+      document.getElementById('sizing-risk-pct').innerText = riskPct.toFixed(1) + '%';
+    }
+
+    async function executePaperTrade() {
+      if (!activeTradeForModal) return;
+      const contracts = parseInt(document.getElementById('sizing-contracts').value) || 1;
+
+      try {
+        const res = await fetch('/api/paper/trade', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            symbol: activeTradeForModal.symbol,
+            strategy_name: activeTradeForModal.strategy_name,
+            legs: activeTradeForModal.legs,
+            entry_price: activeTradeForModal.entry_limit_price,
+            target_price: activeTradeForModal.target_exit_price,
+            stop_loss: activeTradeForModal.stop_loss_price,
+            contracts: contracts,
+            max_profit: activeTradeForModal.max_profit * contracts,
+            max_loss: activeTradeForModal.max_loss * contracts,
+            dte: activeTradeForModal.dte,
+            expiration: activeTradeForModal.expiration
+          })
+        });
+        const resData = await res.json();
+        closeSizingModal();
+        loadPaperPortfolio();
+        alert(`Paper Trade für ${activeTradeForModal.symbol} (${contracts} Kontrakte) erfolgreich eröffnet!`);
+      } catch (e) {
+        alert('Fehler beim Ausführen: ' + e.message);
+      }
+    }
+
+    // -------------------------------------------------------------
+    // PAPER PORTFOLIO LOGIC
+    // -------------------------------------------------------------
+    async function loadPaperPortfolio() {
+      try {
+        const res = await fetch('/api/paper/portfolio');
+        const data = await res.json();
+
+        document.getElementById('paper-balance').innerText = '$' + data.total_equity.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('paper-cash').innerText = '$' + data.cash_balance.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('paper-margin').innerText = '$' + data.allocated_margin.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        
+        const isPos = data.realized_pnl >= 0;
+        document.getElementById('paper-realized-pnl').className = `text-2xl font-bold font-mono mt-1 ${isPos ? 'text-accentgreen' : 'text-accentred'}`;
+        document.getElementById('paper-realized-pnl').innerText = `${isPos ? '+' : ''}$${data.realized_pnl.toFixed(2)}`;
+        document.getElementById('paper-winrate').innerText = `Win Rate: ${data.win_rate_pct}% (${data.total_closed_trades} Trades)`;
+
+        const openCount = data.open_positions ? data.open_positions.length : 0;
+        document.getElementById('paper-open-count').innerText = openCount;
+        document.getElementById('paper-badge').innerText = openCount;
+
+        // Populate Open Positions
+        const tbodyOpen = document.getElementById('paper-positions-body');
+        if (!data.open_positions || data.open_positions.length === 0) {
+          tbodyOpen.innerHTML = '<tr><td colspan="9" class="text-center py-6 text-gray-500">Keine offenen Positionen. Wähle Setups im Scanner aus!</td></tr>';
+        } else {
+          let html = '';
+          data.open_positions.forEach(p => {
+            html += `
+              <tr class="hover:bg-darkbg/60">
+                <td class="px-4 py-2 text-gray-500">#${p.trade_id}</td>
+                <td class="px-4 py-2 font-bold text-yellow-400">${p.symbol}</td>
+                <td class="px-4 py-2 text-xs">${p.strategy_name}</td>
+                <td class="px-4 py-2 text-gray-300 text-xs">${p.legs}</td>
+                <td class="px-4 py-2 text-accentgreen font-bold">$${p.entry_price.toFixed(2)}</td>
+                <td class="px-4 py-2 text-white font-bold">${p.contracts}</td>
+                <td class="px-4 py-2 text-xs text-gray-300">+$${p.max_profit} / -$${p.max_loss}</td>
+                <td class="px-4 py-2 text-xs font-mono text-gray-300">TP: $${p.target_price.toFixed(2)} | SL: $${p.stop_loss.toFixed(2)}</td>
+                <td class="px-4 py-2 text-center">
+                  <div class="flex items-center justify-center gap-1">
+                    <button onclick="closePaperPosition(${p.trade_id}, ${p.target_price}, 'PROFIT_TARGET')" class="bg-accentgreen/20 hover:bg-accentgreen/30 text-accentgreen border border-accentgreen/40 px-2 py-1 rounded text-[10px] font-bold">TP Close</button>
+                    <button onclick="closePaperPosition(${p.trade_id}, ${p.stop_loss}, 'STOP_LOSS')" class="bg-accentred/20 hover:bg-accentred/30 text-accentred border border-accentred/40 px-2 py-1 rounded text-[10px] font-bold">SL Close</button>
+                  </div>
+                </td>
+              </tr>
+            `;
+          });
+          tbodyOpen.innerHTML = html;
+        }
+
+        // Populate Closed Positions
+        const tbodyClosed = document.getElementById('paper-closed-body');
+        document.getElementById('paper-closed-count').innerText = `${(data.closed_trades || []).length} geschlossene Trades`;
+        if (!data.closed_trades || data.closed_trades.length === 0) {
+          tbodyClosed.innerHTML = '<tr><td colspan="8" class="text-center py-6 text-gray-500">Noch keine Trades geschlossen.</td></tr>';
+        } else {
+          let htmlClosed = '';
+          data.closed_trades.slice().reverse().forEach(c => {
+            const isWin = c.realized_pnl >= 0;
+            const pnlColor = isWin ? 'text-accentgreen font-bold' : 'text-accentred font-bold';
+            htmlClosed += `
+              <tr class="hover:bg-darkbg/60">
+                <td class="px-4 py-2 text-gray-500">#${c.trade_id}</td>
+                <td class="px-4 py-2 font-bold text-yellow-400">${c.symbol}</td>
+                <td class="px-4 py-2 text-xs">${c.strategy_name}</td>
+                <td class="px-4 py-2 text-gray-400 text-xs">${c.entry_date.split('T')[0]} &rarr; ${c.exit_date.split('T')[0]}</td>
+                <td class="px-4 py-2 text-gray-300">$${c.entry_price.toFixed(2)}</td>
+                <td class="px-4 py-2 text-gray-300">$${c.exit_price.toFixed(2)}</td>
+                <td class="px-4 py-2 text-right ${pnlColor}">${isWin ? '+' : ''}$${c.realized_pnl.toFixed(2)}</td>
+                <td class="px-4 py-2 text-gray-400 text-[11px]">${c.close_reason}</td>
+              </tr>
+            `;
+          });
+          tbodyClosed.innerHTML = htmlClosed;
+        }
+
+      } catch (e) {
+        console.error("Error loading paper portfolio", e);
+      }
+    }
+
+    async function closePaperPosition(tradeId, exitPrice, reason) {
+      try {
+        const res = await fetch('/api/paper/close', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ trade_id: tradeId, exit_price: exitPrice, reason: reason })
+        });
+        await res.json();
+        loadPaperPortfolio();
+      } catch (e) {
+        alert('Fehler beim Schließen: ' + e.message);
+      }
+    }
+
+    // -------------------------------------------------------------
+    // MONTE CARLO CHART & BACKTEST LOGIC
+    // -------------------------------------------------------------
+    async function loadMonteCarlo() {
+      try {
+        const res = await fetch('/api/backtest/monte-carlo');
+        const data = await res.json();
+
+        document.getElementById('mc-p5').innerText = '+' + data.cagr_percentiles.p5 + '% p.a.';
+        document.getElementById('mc-p50').innerText = '+' + data.cagr_percentiles.p50_median + '% p.a.';
+        document.getElementById('mc-p95').innerText = '+' + data.cagr_percentiles.p95 + '% p.a.';
+        document.getElementById('mc-prob-50').innerText = data.risk_metrics.prob_cagr_over_50pct + '%';
+
+        renderMonteCarloChart(data.chart_paths);
+      } catch (e) {
+        console.error("Error loading Monte Carlo", e);
+      }
+    }
+
+    function renderMonteCarloChart(paths) {
+      const ctx = document.getElementById('mcChart').getContext('2d');
+      if (mcChartInstance) {
+        mcChartInstance.destroy();
+      }
+
+      mcChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: paths.steps.map(s => 'Trade ' + s),
+          datasets: [
+            {
+              label: '95. Perzentil (Best Case)',
+              data: paths.p95,
+              borderColor: '#06B6D4',
+              borderWidth: 2,
+              fill: false,
+              pointRadius: 0,
+              tension: 0.2
+            },
+            {
+              label: '50. Perzentil (Median)',
+              data: paths.p50,
+              borderColor: '#00C805',
+              borderWidth: 2.5,
+              fill: false,
+              pointRadius: 0,
+              tension: 0.2
+            },
+            {
+              label: '5. Perzentil (Worst Case)',
+              data: paths.p5,
+              borderColor: '#F59E0B',
+              borderWidth: 2,
+              fill: false,
+              pointRadius: 0,
+              tension: 0.2
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          scales: {
+            x: {
+              grid: { color: '#1F2937' },
+              ticks: { color: '#9CA3AF', maxTicksLimit: 10 }
+            },
+            y: {
+              title: { display: true, text: 'Portfolio Equity ($)', color: '#9CA3AF' },
+              grid: { color: '#1F2937' },
+              ticks: {
+                color: '#9CA3AF',
+                callback: function(val) { return '$' + (val / 1000).toFixed(0) + 'k'; }
+              }
+            }
+          },
+          plugins: {
+            legend: { labels: { color: '#E5E7EB', boxWidth: 12 } }
+          }
+        }
+      });
+    }
+
     async function loadBacktestTrades() {
       const tbody = document.getElementById('backtest-trades-body');
       tbody.innerHTML = '<tr><td colspan="9" class="text-center py-6 text-accentcyan animate-pulse">Lade Trade-Historie...</td></tr>';
@@ -570,6 +1287,8 @@
         fetchSignals();
       } else if (activeTab === 'chain') {
         loadChain();
+      } else if (activeTab === 'paper') {
+        loadPaperPortfolio();
       }
     }
 

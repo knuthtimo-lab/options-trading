@@ -1,6 +1,11 @@
 """
 FastAPI Server for Quantitative Options Trading & Greeks Scanner
-Provides REST API endpoints and serves the Web Dashboard.
+Institutional-Grade Backend:
+- Confidence Engine (0-100% Score & Grade A+ to D)
+- Interactive Payoff Diagram Calculations
+- GEX & VEX by Strike Profiling
+- Monte Carlo Robustness Simulator (1,000 bootstrap runs)
+- Virtual Paper Trading Portfolio & Kelly Position Sizer
 """
 
 from typing import List, Optional, Dict, Any
@@ -9,7 +14,7 @@ from datetime import datetime
 import json
 import numpy as np
 import pandas as pd
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import FastAPI, Query, HTTPException, Body
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,14 +22,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.data.live_feed import LiveDataFeed
 from src.engine.dealer_greeks import DealerGreeksEngine
 from src.engine.black_scholes import BlackScholesEngine
+from src.engine.payoff_visualizer import PayoffVisualizer
 from src.strategy.signal_generator import SignalGenerator
 from src.strategy.regime_detector import RegimeDetector
 from src.strategy.spread_selector import SpreadSelector
+from src.strategy.confidence_engine import ConfidenceEngine
+from src.strategy.paper_portfolio import PaperPortfolio, PositionSizer
+from src.backtest.monte_carlo import MonteCarloSimulator
 
 app = FastAPI(
     title="Quantitative Options Scanner & Web Dashboard",
-    description="Real-time options scanner utilizing 2nd order Greeks (Vanna, Charm, Volga) & Dealer Gamma Exposure",
-    version="1.0.0",
+    description="Real-time options scanner utilizing 2nd order Greeks (Vanna, Charm, Volga), Dealer Gamma Exposure & Multi-Factor Confidence Ratings",
+    version="2.0.0",
 )
 
 app.add_middleware(
@@ -79,9 +88,10 @@ def scan_markets(
     min_pop: float = Query(0.0, description="Minimum Probability of Profit (%)"),
     min_roc: float = Query(0.0, description="Minimum Return on Capital (%)"),
     min_iv_rank: float = Query(0.0, description="Minimum IV Rank (%)"),
+    min_confidence: float = Query(0.0, description="Minimum Confidence Score (0-100)"),
     max_dte: int = Query(60, description="Maximum Days to Expiration"),
 ):
-    """Scans requested symbols and returns real-time quantitative trade setups."""
+    """Scans requested symbols, runs Confidence Rating, and returns trade setups."""
     symbol_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
     results = []
 
@@ -96,7 +106,7 @@ def scan_markets(
             gp = sig.gamma_profile
             rg = sig.regime
 
-            # Filtering
+            # Filter early
             if action != "ALL":
                 if action == "SELL" and "SELL" not in tr.action:
                     continue
@@ -111,6 +121,48 @@ def scan_markets(
                 continue
             if tr.dte > max_dte:
                 continue
+
+            # Moving averages from symbol history
+            import yfinance as yf
+            ticker_obj = yf.Ticker(sym)
+            hist = ticker_obj.history(period="6mo")
+            ema_20 = float(hist['Close'].ewm(span=20).mean().iloc[-1]) if len(hist) >= 20 else ov.spot_price
+            ema_50 = float(hist['Close'].ewm(span=50).mean().iloc[-1]) if len(hist) >= 50 else ov.spot_price
+            ema_200 = float(hist['Close'].ewm(span=200).mean().iloc[-1]) if len(hist) >= 150 else ema_50
+
+            # EVALUATE MULTI-FACTOR CONFIDENCE RATING
+            conf = ConfidenceEngine.evaluate_trade(
+                action=tr.action,
+                strategy_name=tr.strategy_name,
+                spot_price=ov.spot_price,
+                iv_current=ov.current_iv_estimate,
+                hv_30d=ov.historical_vol_30d,
+                iv_rank=ov.iv_rank_1y,
+                net_gex_dollar_m=gp.net_gex_dollar_1pct / 1e6,
+                put_wall=gp.put_wall_strike,
+                call_wall=gp.call_wall_strike,
+                pop_pct=tr.probability_of_profit_pct,
+                roc_pct=tr.return_on_capital_pct,
+                entry_price=tr.entry_limit_price,
+                short_strike=tr.short_strike,
+                long_strike=tr.long_strike,
+                vix_level=ov.vix_level,
+                ema_20=ema_20,
+                ema_50=ema_50,
+                ema_200=ema_200,
+            )
+
+            if conf.total_score < min_confidence:
+                continue
+
+            # Position Sizing recommendations
+            sizing_half_kelly = PositionSizer.calculate_sizing(
+                account_equity=25000.0,
+                risk_mode="HALF_KELLY",
+                max_loss_per_contract=tr.max_loss_dollar,
+                max_profit_per_contract=tr.max_profit_dollar,
+                win_prob_pct=tr.probability_of_profit_pct,
+            )
 
             results.append({
                 "symbol": sig.symbol,
@@ -127,6 +179,8 @@ def scan_markets(
                 "action": tr.action,
                 "strategy_name": tr.strategy_name,
                 "legs": tr.legs_summary,
+                "short_strike": tr.short_strike,
+                "long_strike": tr.long_strike,
                 "expiration": tr.expiration,
                 "dte": tr.dte,
                 "entry_limit_price": tr.entry_limit_price,
@@ -142,10 +196,19 @@ def scan_markets(
                 "net_theta_daily": tr.net_theta_daily_dollar,
                 "leverage_factor": tr.leverage_factor,
                 "reasoning": tr.reasoning,
-                "regime_confidence": round(rg.confidence * 100.0, 0),
+                # CONFIDENCE METRICS
+                "confidence_score": conf.total_score,
+                "confidence_grade": conf.grade,
+                "confidence_verdict": conf.verdict,
+                "strengths": conf.strengths,
+                "risks": conf.risks,
+                "sizing": sizing_half_kelly,
             })
         except Exception as e:
             continue
+
+    # Sort descending by Confidence Score
+    results.sort(key=lambda x: x["confidence_score"], reverse=True)
 
     return {
         "count": len(results),
@@ -154,16 +217,82 @@ def scan_markets(
     }
 
 
+@app.get("/api/gex/profile/{symbol}")
+def get_gamma_profile_by_strike(symbol: str):
+    """Returns Net GEX by Strike and Call/Put Open Interest distribution for visual charts."""
+    symbol = symbol.upper()
+    try:
+        spot_price, chain_df = LiveDataFeed.get_options_chain_for_dte_range(symbol, min_dte=10, max_dte=50)
+        if chain_df.empty:
+            raise HTTPException(status_code=404, detail=f"No options chain data for {symbol}")
+
+        # Compute GEX per strike
+        df_clean = chain_df[chain_df['strike'].between(spot_price * 0.85, spot_price * 1.15)].copy()
+        
+        strike_metrics = []
+        for strike, group in df_clean.groupby('strike'):
+            call_oi = float(group[group['option_type'].isin(['c', 'call'])]['open_interest'].sum())
+            put_oi = float(group[group['option_type'].isin(['p', 'put'])]['open_interest'].sum())
+            
+            # Approximate GEX for strike
+            gamma = 1.0 / (spot_price * 0.20 * np.sqrt(30/365.0) * np.sqrt(2 * np.pi) + 1e-6)
+            gex_call = call_oi * gamma * 100.0 * (spot_price ** 2) * 0.01 / 1e6
+            gex_put = -put_oi * gamma * 100.0 * (spot_price ** 2) * 0.01 / 1e6
+
+            strike_metrics.append({
+                "strike": float(strike),
+                "call_oi": int(call_oi),
+                "put_oi": int(put_oi),
+                "call_gex_m": round(gex_call, 2),
+                "put_gex_m": round(gex_put, 2),
+                "net_gex_m": round(gex_call + gex_put, 2),
+            })
+
+        strike_metrics.sort(key=lambda x: x['strike'])
+        return {
+            "symbol": symbol,
+            "spot_price": round(spot_price, 2),
+            "strikes": strike_metrics,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/payoff")
+def get_payoff_diagram(
+    strategy_name: str = Query("BULL_PUT_SPREAD"),
+    spot_price: float = Query(500.0),
+    entry_price: float = Query(2.50),
+    short_strike: Optional[float] = Query(None),
+    long_strike: Optional[float] = Query(None),
+    dte: int = Query(30),
+    iv: float = Query(0.20),
+    contracts: int = Query(1),
+):
+    """Calculates evaluation points for interactive PnL Payoff charts."""
+    try:
+        data = PayoffVisualizer.generate_payoff_data(
+            strategy_name=strategy_name,
+            spot_price=spot_price,
+            entry_price=entry_price,
+            short_strike=short_strike,
+            long_strike=long_strike,
+            dte=dte,
+            iv=iv,
+            contracts=contracts,
+        )
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/chain/{symbol}")
 def get_options_chain_with_greeks(
     symbol: str,
     expiration: Optional[str] = None,
     opt_type: str = Query("all", description="all, call, or put"),
 ):
-    """
-    Returns full options chain for symbol with all 1st and 2nd order Greeks:
-    Delta, Gamma, Vega, Theta, Vanna, Charm, Volga, Speed.
-    """
+    """Returns full options chain with 1st and 2nd order Greeks."""
     symbol = symbol.upper()
     try:
         spot_price, chain_df = LiveDataFeed.get_options_chain_for_dte_range(symbol, min_dte=5, max_dte=70)
@@ -204,7 +333,6 @@ def get_options_chain_with_greeks(
                 "iv_pct": round(iv * 100.0, 1),
                 "open_interest": int(r_data['open_interest']),
                 "volume": int(r_data['volume']),
-                # 1st & 2nd Order Greeks
                 "delta": round(greeks.delta, 3),
                 "gamma": round(greeks.gamma, 4),
                 "vega": round(greeks.vega, 3),
@@ -262,6 +390,17 @@ def get_backtest_summary():
     }
 
 
+@app.get("/api/backtest/monte-carlo")
+def get_monte_carlo():
+    """Runs 1000-path bootstrap simulation on the historical trade log."""
+    trades_file = BASE_DIR / "backtest_trades.csv"
+    if not trades_file.exists():
+        raise HTTPException(status_code=404, detail="Trade log not found.")
+    df = pd.read_csv(trades_file)
+    res = MonteCarloSimulator.run_simulation(df, initial_capital=25000.0, num_simulations=1000)
+    return res
+
+
 @app.get("/api/backtest/trades")
 def get_backtest_trades(limit: int = 50, offset: int = 0):
     """Returns paginated trades from the backtest trade log."""
@@ -278,3 +417,38 @@ def get_backtest_trades(limit: int = 50, offset: int = 0):
         "limit": limit,
         "trades": slice_df.to_dict(orient="records"),
     }
+
+
+# -------------------------------------------------------------
+# PAPER TRADING ENDPOINTS
+# -------------------------------------------------------------
+@app.get("/api/paper/portfolio")
+def get_paper_portfolio():
+    return PaperPortfolio.get_portfolio()
+
+
+@app.post("/api/paper/trade")
+def add_paper_trade(trade: Dict[str, Any] = Body(...)):
+    new_t = PaperPortfolio.add_trade(trade)
+    return {"status": "SUCCESS", "trade": new_t}
+
+
+@app.post("/api/paper/close")
+def close_paper_trade(data: Dict[str, Any] = Body(...)):
+    trade_id = data.get("trade_id")
+    exit_price = data.get("exit_price", 0.0)
+    reason = data.get("reason", "MANUAL_EXIT")
+    closed = PaperPortfolio.close_trade(trade_id, exit_price, reason)
+    if not closed:
+        raise HTTPException(status_code=404, detail="Trade not found.")
+    return {"status": "SUCCESS", "closed_trade": closed}
+
+
+@app.post("/api/paper/size")
+def calculate_sizing(data: Dict[str, Any] = Body(...)):
+    account_equity = data.get("account_equity", 25000.0)
+    risk_mode = data.get("risk_mode", "HALF_KELLY")
+    max_loss = data.get("max_loss", 500.0)
+    max_profit = data.get("max_profit", 500.0)
+    win_prob = data.get("win_prob_pct", 75.0)
+    return PositionSizer.calculate_sizing(account_equity, risk_mode, max_loss, max_profit, win_prob)
