@@ -42,8 +42,9 @@ class TradeRecommendation:
 
 
 class SpreadSelector:
-    @staticmethod
+    @classmethod
     def select_best_trade(
+        cls,
         symbol: str,
         chain_df: pd.DataFrame,
         spot_price: float,
@@ -391,7 +392,154 @@ class SpreadSelector:
                 )
             )
 
+        # -------------------------------------------------------------
+        # STRATEGY: LEVERAGED LONG PUT (Downside Convexity)
+        # -------------------------------------------------------------
+        elif strategy_type in ("LEVERAGED_LONG_PUT", "BUY_PUT"):
+            if puts.empty:
+                return None
+
+            puts_copy = puts.copy()
+            # Target 0.40 - 0.50 delta put (centered at 0.45)
+            puts_copy['delta_dist'] = (puts_copy['abs_delta'] - 0.45).abs()
+            put_row = puts_copy.sort_values('delta_dist').iloc[0]
+            k = float(put_row['strike'])
+            mid = float(put_row['mid'])
+            greeks = put_row['greeks']
+
+            entry_price = mid
+            if entry_price <= 0.05:
+                return None
+
+            max_loss = entry_price * 100.0
+            target_exit = entry_price * 2.0
+            stop_loss = entry_price * 0.60
+            max_profit = entry_price * 2.0 * 100.0
+
+            leverage = (put_row['abs_delta'] * spot_price) / entry_price if entry_price > 0 else 1.0
+            pop = put_row['abs_delta'] * 100.0
+
+            return TradeRecommendation(
+                symbol=symbol,
+                action="BUY (DEBIT/LEVERAGE)",
+                strategy_name="Leveraged Long Put (Downside Convexity)",
+                expiration=best_exp,
+                dte=dte,
+                spot_price=spot_price,
+                legs_summary=f"Buy ${k:.1f} Put (Delta {greeks.delta:.2f})",
+                short_strike=None,
+                long_strike=k,
+                entry_limit_price=round(entry_price, 2),
+                target_exit_price=round(target_exit, 2),
+                stop_loss_price=round(stop_loss, 2),
+                max_profit_dollar=round(max_profit, 2),
+                max_loss_dollar=round(max_loss, 2),
+                return_on_capital_pct=100.0,
+                probability_of_profit_pct=round(pop, 1),
+                net_delta=round(greeks.delta * 100.0, 2),
+                net_gamma=round(greeks.gamma * 100.0, 4),
+                net_vanna=round(greeks.vanna * 100.0, 2),
+                net_theta_daily_dollar=round(greeks.theta * 100.0, 2),
+                leverage_factor=round(leverage, 1),
+                reasoning=(
+                    f"Bearish breakdown with Negative Gamma creates accelerated cascade risk. "
+                    f"Underpriced puts provide explosive {leverage:.1f}x effective downside leverage with capped risk (${max_loss:.0f})."
+                )
+            )
+
+        # -------------------------------------------------------------
+        # STRATEGY: BEAR PUT DEBIT SPREAD
+        # -------------------------------------------------------------
+        elif strategy_type in ("BEAR_PUT_DEBIT_SPREAD", "BEAR_PUT_SPREAD"):
+            if puts.empty or len(puts) < 2:
+                return None
+
+            # Long Put: target 0.50 delta put
+            puts_copy = puts.copy()
+            puts_copy['delta_dist'] = (puts_copy['abs_delta'] - 0.50).abs()
+            long_put_row = puts_copy.sort_values('delta_dist').iloc[0]
+            long_k = float(long_put_row['strike'])
+            long_mid = float(long_put_row['mid'])
+            long_greeks = long_put_row['greeks']
+
+            # Short Put: target 0.20 delta put below long strike
+            otm_puts = puts[puts['strike'] < long_k].copy()
+            if otm_puts.empty:
+                target_short_k = long_k - wing_width
+                otm_puts = puts[puts['strike'] <= target_short_k].copy()
+            if otm_puts.empty:
+                return None
+
+            otm_puts['delta_dist'] = (otm_puts['abs_delta'] - 0.20).abs()
+            short_put_row = otm_puts.sort_values('delta_dist').iloc[0]
+            short_k = float(short_put_row['strike'])
+            short_mid = float(short_put_row['mid'])
+            short_greeks = short_put_row['greeks']
+
+            net_debit = long_mid - short_mid
+            if net_debit <= 0.10:
+                net_debit = 0.25
+
+            width = long_k - short_k
+            if width <= 0:
+                width = wing_width
+                short_k = long_k - width
+
+            max_loss = net_debit * 100.0
+            max_profit = (width - net_debit) * 100.0
+            roc = (max_profit / max_loss) * 100.0 if max_loss > 0 else 0.0
+
+            target_exit = round(net_debit + 0.50 * (width - net_debit), 2)
+            stop_loss = round(net_debit * 0.50, 2)
+            pop = round(long_put_row['abs_delta'] * 100.0, 1)
+
+            net_delta = (long_greeks.delta - short_greeks.delta) * 100.0
+            net_gamma = (long_greeks.gamma - short_greeks.gamma) * 100.0
+            net_vanna = (long_greeks.vanna - short_greeks.vanna) * 100.0
+            net_theta = (long_greeks.theta - short_greeks.theta) * 100.0
+            leverage = abs(net_delta / 100.0 * spot_price) / net_debit if net_debit > 0 else 1.0
+
+            return TradeRecommendation(
+                symbol=symbol,
+                action="BUY (DEBIT/LEVERAGE)",
+                strategy_name="Bear Put Debit Spread (Defined Risk)",
+                expiration=best_exp,
+                dte=dte,
+                spot_price=spot_price,
+                legs_summary=f"Buy ${long_k:.1f} Put (~0.50D) / Sell ${short_k:.1f} Put (~0.20D)",
+                short_strike=short_k,
+                long_strike=long_k,
+                entry_limit_price=round(net_debit, 2),
+                target_exit_price=round(target_exit, 2),
+                stop_loss_price=round(stop_loss, 2),
+                max_profit_dollar=round(max_profit, 2),
+                max_loss_dollar=round(max_loss, 2),
+                return_on_capital_pct=round(roc, 1),
+                probability_of_profit_pct=round(pop, 1),
+                net_delta=round(net_delta, 2),
+                net_gamma=round(net_gamma, 4),
+                net_vanna=round(net_vanna, 2),
+                net_theta_daily_dollar=round(net_theta, 2),
+                leverage_factor=round(leverage, 1),
+                reasoning=(
+                    f"Bear Put Debit Spread captures downside breakdown in Negative Gamma. "
+                    f"Long ~0.50 delta (${long_k:.1f}) Put subsidized by short ~0.20 delta (${short_k:.1f}) Put. "
+                    f"Max risk strictly capped at net debit (${max_loss:.0f}) with potential return of +{roc:.1f}%."
+                )
+            )
+
         # Fallback if specific strategy was not triggered
+        is_bearish_requested = any(b in strategy_type.upper() for b in ["BEAR", "PUT", "SHORT", "DOWNTREND"])
+        if is_bearish_requested:
+            # Under NO circumstances sell Bull Put Spreads when bearish!
+            if not puts.empty and len(puts) >= 2:
+                return cls.select_best_trade(symbol, chain_df, spot_price, "BEAR_PUT_DEBIT_SPREAD", target_dte_min, target_dte_max, risk_free_rate, dividend_yield)
+            elif not calls.empty and len(calls) >= 3:
+                return cls.select_best_trade(symbol, chain_df, spot_price, "BEAR_CALL_SPREAD", target_dte_min, target_dte_max, risk_free_rate, dividend_yield)
+            elif not puts.empty:
+                return cls.select_best_trade(symbol, chain_df, spot_price, "LEVERAGED_LONG_PUT", target_dte_min, target_dte_max, risk_free_rate, dividend_yield)
+            return None
+
         if not puts.empty and len(puts) >= 3:
             return cls.select_best_trade(symbol, chain_df, spot_price, "BULL_PUT_SPREAD", target_dte_min, target_dte_max, risk_free_rate, dividend_yield)
         elif not calls.empty:

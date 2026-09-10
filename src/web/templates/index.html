@@ -692,31 +692,39 @@
           </div>
         </div>
 
-        <!-- Live Ticker KPI Ribbon -->
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-3 border-t border-cardborder/60 font-mono">
-          <div class="bg-darkbg/80 p-3 rounded-xl border border-cardborder/60">
-            <span class="text-[10px] text-slate-400 block uppercase">Spot Preis</span>
-            <span id="chain-spot" class="text-base font-bold text-white">$---.--</span>
+        <!-- Live Ticker KPI Ribbon (8 Institutional Metrics) -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 pt-3 border-t border-cardborder/60 font-mono">
+          <div class="bg-darkbg/80 p-2.5 rounded-xl border border-cardborder/60">
+            <span class="text-[9px] text-slate-400 block uppercase">Spot Preis</span>
+            <span id="chain-spot" class="text-sm font-bold text-white">$---.--</span>
           </div>
-          <div class="bg-darkbg/80 p-3 rounded-xl border border-cardborder/60">
-            <span class="text-[10px] text-slate-400 block uppercase">Restlaufzeit</span>
-            <span id="chain-dte" class="text-base font-bold text-sky-400">-- Tage</span>
+          <div class="bg-darkbg/80 p-2.5 rounded-xl border border-cardborder/60">
+            <span class="text-[9px] text-slate-400 block uppercase">Restlaufzeit</span>
+            <span id="chain-dte" class="text-sm font-bold text-sky-400">-- Tage</span>
           </div>
-          <div class="bg-darkbg/80 p-3 rounded-xl border border-cardborder/60">
-            <span class="text-[10px] text-slate-400 block uppercase">Call Open Interest</span>
-            <span id="chain-total-call-oi" class="text-base font-bold text-emerald-400">--</span>
+          <div class="bg-darkbg/80 p-2.5 rounded-xl border border-cardborder/60">
+            <span class="text-[9px] text-slate-400 block uppercase">Call Open Int.</span>
+            <span id="chain-total-call-oi" class="text-sm font-bold text-emerald-400">--</span>
           </div>
-          <div class="bg-darkbg/80 p-3 rounded-xl border border-cardborder/60">
-            <span class="text-[10px] text-slate-400 block uppercase">Put Open Interest</span>
-            <span id="chain-total-put-oi" class="text-base font-bold text-rose-400">--</span>
+          <div class="bg-darkbg/80 p-2.5 rounded-xl border border-cardborder/60">
+            <span class="text-[9px] text-slate-400 block uppercase">Put Open Int.</span>
+            <span id="chain-total-put-oi" class="text-sm font-bold text-rose-400">--</span>
           </div>
-          <div class="bg-darkbg/80 p-3 rounded-xl border border-cardborder/60">
-            <span class="text-[10px] text-slate-400 block uppercase">Put / Call Ratio</span>
-            <span id="chain-pc-ratio" class="text-base font-bold text-amber-400">--</span>
+          <div class="bg-darkbg/80 p-2.5 rounded-xl border border-cardborder/60">
+            <span class="text-[9px] text-slate-400 block uppercase">Put / Call Ratio</span>
+            <span id="chain-pc-ratio" class="text-sm font-bold text-amber-400">--</span>
           </div>
-          <div class="bg-darkbg/80 p-3 rounded-xl border border-cardborder/60">
-            <span class="text-[10px] text-slate-400 block uppercase">Max OI Strike</span>
-            <span id="chain-max-oi-strike" class="text-base font-bold text-purple-400">$---</span>
+          <div class="bg-darkbg/80 p-2.5 rounded-xl border border-cardborder/60">
+            <span class="text-[9px] text-slate-400 block uppercase">Max OI Strike</span>
+            <span id="chain-max-oi-strike" class="text-sm font-bold text-purple-400">$---</span>
+          </div>
+          <div class="bg-darkbg/80 p-2.5 rounded-xl border border-cardborder/60">
+            <span class="text-[9px] text-slate-400 block uppercase">Net Dealer GEX</span>
+            <span id="chain-net-gex" class="text-sm font-bold text-emerald-400">--</span>
+          </div>
+          <div class="bg-darkbg/80 p-2.5 rounded-xl border border-cardborder/60">
+            <span class="text-[9px] text-slate-400 block uppercase">Put / Call Wall</span>
+            <span id="chain-walls" class="text-sm font-bold text-slate-200">$-- / $--</span>
           </div>
         </div>
 
@@ -2149,15 +2157,96 @@
                   <div class="text-gray-300">Return on Capital: <span class="text-accentcyan font-bold">${t.roc_pct}%</span></div>
                 </div>
 
+                <!-- Technical Indicators Row -->
+                <div class="flex flex-wrap items-center gap-1.5 mb-3 text-[10px] font-mono">
+                  <span class="bg-darkbg px-2 py-0.5 rounded border border-cardborder text-slate-300">RSI(14): <strong class="${(t.rsi || 50) < 30 ? 'text-emerald-400 font-bold' : ((t.rsi || 50) > 70 ? 'text-rose-400 font-bold' : 'text-white')}">${(t.rsi || 50).toFixed(1)}</strong></span>
+                  <span class="bg-darkbg px-2 py-0.5 rounded border border-cardborder text-slate-300">EMA 20/50: <strong class="text-sky-400">$${(t.ema_20 || t.spot_price).toFixed(1)}</strong> / <strong class="text-slate-400">$${(t.ema_50 || t.spot_price).toFixed(1)}</strong></span>
+                  <span class="bg-darkbg px-2 py-0.5 rounded border border-cardborder text-slate-300">VRP: <strong class="${(t.vrp_spread || 0) >= 2.0 ? 'text-emerald-400' : 'text-slate-400'}">+${(t.vrp_spread || 0).toFixed(1)} pts</strong></span>
+                </div>
+
+                <!-- Institutional Verdict Banner -->
+                <div class="mb-3 bg-gradient-to-r from-sky-950/40 via-slate-900 to-indigo-950/40 p-2.5 rounded-xl border border-sky-500/25 text-xs">
+                  <div class="text-[10px] font-mono text-sky-400 font-bold uppercase tracking-wider mb-0.5 flex items-center gap-1">
+                    <i data-lucide="shield-check" class="w-3.5 h-3.5 text-sky-400"></i>
+                    <span>Institutional Verdict</span>
+                  </div>
+                  <p class="text-slate-200 text-xs leading-snug">${t.confidence_verdict || t.reasoning}</p>
+                </div>
+
+                <!-- Visual 6-Factor Confidence Breakdown -->
+                <div class="mb-3 bg-darkbg/90 p-2.5 rounded-xl border border-cardborder/70 text-[11px] font-mono">
+                  <div class="text-slate-400 font-bold text-[10px] uppercase mb-1.5 flex justify-between items-center">
+                    <span>Confidence Score Breakdown</span>
+                    <span class="text-emerald-400 font-bold">${t.confidence_score || 0} / 100 Pkt</span>
+                  </div>
+                  <div class="grid grid-cols-2 gap-x-3 gap-y-1.5">
+                    <div>
+                      <div class="flex justify-between text-[10px] text-slate-400 mb-0.5">
+                        <span>VRP Edge</span>
+                        <span class="text-sky-300">${(t.vrp_score || 0).toFixed(0)}/25</span>
+                      </div>
+                      <div class="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                        <div class="h-full bg-sky-400 rounded-full" style="width: ${Math.min(100, ((t.vrp_score || 0)/25)*100)}%"></div>
+                      </div>
+                    </div>
+                    <div>
+                      <div class="flex justify-between text-[10px] text-slate-400 mb-0.5">
+                        <span>GEX & Wall</span>
+                        <span class="text-emerald-300">${(t.gex_alignment_score || 0).toFixed(0)}/25</span>
+                      </div>
+                      <div class="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                        <div class="h-full bg-emerald-400 rounded-full" style="width: ${Math.min(100, ((t.gex_alignment_score || 0)/25)*100)}%"></div>
+                      </div>
+                    </div>
+                    <div>
+                      <div class="flex justify-between text-[10px] text-slate-400 mb-0.5">
+                        <span>Trend</span>
+                        <span class="text-amber-300">${(t.trend_score || 0).toFixed(0)}/20</span>
+                      </div>
+                      <div class="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                        <div class="h-full bg-amber-400 rounded-full" style="width: ${Math.min(100, ((t.trend_score || 0)/20)*100)}%"></div>
+                      </div>
+                    </div>
+                    <div>
+                      <div class="flex justify-between text-[10px] text-slate-400 mb-0.5">
+                        <span>POP Win-Rate</span>
+                        <span class="text-purple-300">${(t.pop_score || 0).toFixed(0)}/15</span>
+                      </div>
+                      <div class="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                        <div class="h-full bg-purple-400 rounded-full" style="width: ${Math.min(100, ((t.pop_score || 0)/15)*100)}%"></div>
+                      </div>
+                    </div>
+                    <div>
+                      <div class="flex justify-between text-[10px] text-slate-400 mb-0.5">
+                        <span>Liquidität</span>
+                        <span class="text-cyan-300">${(t.liquidity_score || 0).toFixed(0)}/10</span>
+                      </div>
+                      <div class="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                        <div class="h-full bg-cyan-400 rounded-full" style="width: ${Math.min(100, ((t.liquidity_score || 0)/10)*100)}%"></div>
+                      </div>
+                    </div>
+                    <div>
+                      <div class="flex justify-between text-[10px] text-slate-400 mb-0.5">
+                        <span>Makro VIX</span>
+                        <span class="text-indigo-300">${(t.macro_buffer_score || 0).toFixed(0)}/5</span>
+                      </div>
+                      <div class="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                        <div class="h-full bg-indigo-400 rounded-full" style="width: ${Math.min(100, ((t.macro_buffer_score || 0)/5)*100)}%"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <ul class="text-[11px] mb-3 space-y-0.5 bg-darkbg/50 p-2 rounded border border-cardborder/50">
                   ${strengthsHtml}
                   ${risksHtml}
                 </ul>
 
-                <div class="flex items-center gap-3 text-[11px] font-mono border-t border-cardborder/50 pt-2 text-gray-400">
-                  <div>Theta: <span class="text-accentgreen">+${t.net_theta_daily.toFixed(2)} $/Tag</span></div>
-                  <div>Vanna: <span class="text-white">${t.net_vanna.toFixed(1)}</span></div>
-                  <div>Delta: <span class="text-white">${t.net_delta.toFixed(2)}</span></div>
+                <div class="flex items-center justify-between text-[11px] font-mono border-t border-cardborder/50 pt-2 text-gray-400">
+                  <div>Theta: <span class="text-accentgreen">+${(t.net_theta_daily || 0).toFixed(2)} $/Tag</span></div>
+                  <div>Vanna: <span class="text-sky-300">${(t.net_vanna || 0).toFixed(1)}</span></div>
+                  <div>Gamma: <span class="text-amber-300">${(t.net_gamma || 0).toFixed(4)}</span></div>
+                  <div>Delta: <span class="text-white">${(t.net_delta || 0).toFixed(2)}</span></div>
                 </div>
               </div>
 
@@ -2927,6 +3016,17 @@
       if (ratEl) ratEl.innerText = opt.primary_rationale;
       if (whyEl) whyEl.innerText = opt.why_this_strategy_beats_others;
 
+      const gexEl = document.getElementById('chain-net-gex');
+      if (gexEl && opt.net_gex_dollar_m !== undefined) {
+        const netM = opt.net_gex_dollar_m || 0;
+        gexEl.innerText = `${netM >= 0 ? '+' : ''}${netM.toFixed(1)}M`;
+        gexEl.className = `text-sm font-bold ${netM >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+      }
+      const wallsEl = document.getElementById('chain-walls');
+      if (wallsEl && opt.put_wall && opt.call_wall) {
+        wallsEl.innerText = `$${opt.put_wall} / $${opt.call_wall}`;
+      }
+
       if (sigContainer) {
         sigContainer.innerHTML = (opt.key_signals || []).map(s => `
           <span class="inline-flex items-center gap-1.5 text-[11px] font-mono bg-darkbg border border-cardborder px-2.5 py-1 rounded-lg text-slate-300 shadow-sm">
@@ -2971,37 +3071,19 @@
     function askCopilotAboutChain() {
       const sym = (document.getElementById('chain-symbol').value || 'SPY').trim().toUpperCase();
       switchTab('ai');
-      const input = document.getElementById('ai-prompt-input');
+      const input = document.getElementById('ai-user-input');
       if (input) {
         input.value = `Erkläre mir die optimale quantitative Options-Strategie für ${sym} basierend auf IV Rank, Dealer Gamma und Volumen-Flow.`;
-        if (typeof submitAiPrompt === 'function') submitAiPrompt();
+        if (typeof sendAiMessage === 'function') sendAiMessage();
       }
-    }
-
-    function openPayoffFromTrade(trade) {
-      document.getElementById('payoff-title').innerHTML = `<i data-lucide="line-chart" class="w-5 h-5 text-accentcyan"></i> Payoff Diagramm: ${trade.symbol} (${trade.strategy_name})`;
-      document.getElementById('payoff-subtitle').innerText = `Strikes: Short $${trade.short_strike} / Long $${trade.long_strike} | POP: ${trade.pop_pct}%`;
-      document.getElementById('payoff-modal').classList.remove('hidden');
-      if (window.lucide) lucide.createIcons();
-
-      fetch(`/api/payoff?strategy_name=${encodeURIComponent(trade.strategy_name)}&spot_price=${trade.spot_price}&entry_credit=${trade.entry_limit_price}&short_strike=${trade.short_strike || ''}&long_strike=${trade.long_strike || ''}&contracts=1`)
-        .then(r => r.json())
-        .then(data => {
-          document.getElementById('payoff-max-profit').innerText = '+$' + (data.max_profit || trade.max_profit).toFixed(2);
-          document.getElementById('payoff-max-loss').innerText = '-$' + (data.max_loss || trade.max_loss).toFixed(2);
-          document.getElementById('payoff-breakeven').innerText = (data.breakevens || []).map(b => '$' + b.toFixed(2)).join(', ') || 'N/A';
-          document.getElementById('payoff-rr').innerText = (data.risk_reward_ratio || 0).toFixed(2);
-          renderPayoffChart(data);
-        })
-        .catch(err => console.error("Payoff fetch error", err));
     }
 
     function askCopilotAbout(symbol) {
       switchTab('ai');
-      const input = document.getElementById('ai-prompt-input');
+      const input = document.getElementById('ai-user-input');
       if (input) {
         input.value = `Analysiere bitte ${symbol} mit aktuellem Spot-Preis, Dealer-Gamma-Regime, Vanna-Flow und dem optimalen Setup.`;
-        submitAiPrompt();
+        if (typeof sendAiMessage === 'function') sendAiMessage();
       }
     }
 
@@ -3120,6 +3202,27 @@
       activeTradeForModal = trade;
 
       document.getElementById('sizing-subtitle').innerText = `${trade.symbol} ${trade.strategy_name} | Max Profit: $${trade.max_profit} | Max Loss: $${trade.max_loss}`;
+      document.getElementById('sizing-modal').classList.remove('hidden');
+      recalcSizing();
+    }
+
+    function openSizingFromTrade(trade) {
+      if (!trade) return;
+      activeTradeForModal = {
+        symbol: trade.symbol,
+        strategy_name: trade.strategy_name || trade.setup_title || 'Options Setup',
+        legs: trade.legs || trade.legs_summary || (trade.short_strike ? `Short $${trade.short_strike} / Long $${trade.long_strike}` : `Strike $${trade.strike || trade.leaps_strike || ''}`),
+        entry_limit_price: trade.entry_limit_price || trade.entry_price || (trade.net_debit_dollar ? trade.net_debit_dollar / 100.0 : 1.0),
+        target_exit_price: trade.target_exit_price || trade.take_profit_target_price || trade.target_1_price || 2.0,
+        stop_loss_price: trade.stop_loss_price || trade.stop_loss_target_price || 0.5,
+        max_profit: trade.max_profit || trade.max_profit_dollar || 500.0,
+        max_loss: trade.max_loss || trade.max_loss_dollar || trade.max_risk_dollar || 500.0,
+        pop_pct: trade.pop_pct || trade.probability_of_profit_pct || 70.0,
+        dte: trade.dte || trade.leaps_dte || 45,
+        expiration: trade.expiration || trade.leaps_expiration || ''
+      };
+
+      document.getElementById('sizing-subtitle').innerText = `${activeTradeForModal.symbol} ${activeTradeForModal.strategy_name} | Max Profit: $${activeTradeForModal.max_profit.toFixed(0)} | Max Loss: $${activeTradeForModal.max_loss.toFixed(0)}`;
       document.getElementById('sizing-modal').classList.remove('hidden');
       recalcSizing();
     }
@@ -3412,6 +3515,10 @@
       updateMacro();
       if (activeTab === 'scanner') {
         fetchSignals(false);
+      } else if (activeTab === 'curated') {
+        if (typeof loadCuratedSetups === 'function') loadCuratedSetups(false);
+      } else if (activeTab === 'asymmetric') {
+        if (typeof loadAsymmetricSetups === 'function') loadAsymmetricSetups();
       } else if (activeTab === 'unusual') {
         loadUnusualGreeks(false);
       } else if (activeTab === 'chain') {

@@ -13,8 +13,10 @@ from pathlib import Path
 from datetime import datetime
 import time
 import json
+import concurrent.futures
 import numpy as np
 import pandas as pd
+import yfinance as yf
 from fastapi import FastAPI, Query, HTTPException, Body
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -49,6 +51,59 @@ def get_from_cache(key: str) -> Optional[Any]:
 def set_in_cache(key: str, value: Any, ttl_seconds: int = 60):
     _CACHE[key] = value
     _CACHE_EXPIRY[key] = time.time() + ttl_seconds
+
+
+def calculate_technical_indicators(symbol: str, spot_fallback: float) -> Dict[str, float]:
+    """
+    Fetches price history and calculates 14-period RSI and EMAs (20, 50, 200).
+    """
+    try:
+        ticker = yf.Ticker(symbol)
+        hist = ticker.history(period="1y")
+        if hist.empty or len(hist) < 15:
+            return {
+                "rsi": 50.0,
+                "ema_20": spot_fallback,
+                "ema_50": spot_fallback,
+                "ema_200": spot_fallback,
+            }
+
+        close = hist["Close"]
+
+        # 14-period Wilder's RSI
+        delta = close.diff()
+        gain = delta.clip(lower=0.0)
+        loss = -delta.clip(upper=0.0)
+        avg_gain = gain.ewm(alpha=1.0 / 14.0, min_periods=14, adjust=False).mean()
+        avg_loss = loss.ewm(alpha=1.0 / 14.0, min_periods=14, adjust=False).mean()
+
+        last_gain = avg_gain.iloc[-1]
+        last_loss = avg_loss.iloc[-1]
+        if last_loss == 0:
+            rsi = 100.0 if last_gain > 0 else 50.0
+        else:
+            rs = last_gain / last_loss
+            rsi = float(100.0 - (100.0 / (1.0 + rs)))
+
+        rsi = round(max(0.0, min(100.0, rsi)), 1)
+        ema_20 = float(close.ewm(span=20, adjust=False).mean().iloc[-1]) if len(close) >= 20 else spot_fallback
+        ema_50 = float(close.ewm(span=50, adjust=False).mean().iloc[-1]) if len(close) >= 50 else spot_fallback
+        ema_200 = float(close.ewm(span=200, adjust=False).mean().iloc[-1]) if len(close) >= 150 else ema_50
+
+        return {
+            "rsi": rsi,
+            "ema_20": round(ema_20, 2),
+            "ema_50": round(ema_50, 2),
+            "ema_200": round(ema_200, 2),
+        }
+    except Exception:
+        return {
+            "rsi": 50.0,
+            "ema_20": spot_fallback,
+            "ema_50": spot_fallback,
+            "ema_200": spot_fallback,
+        }
+
 
 app = FastAPI(
     title="Quantitative Options Scanner & Web Dashboard",
@@ -123,13 +178,12 @@ def scan_markets(
         return cached
 
     symbol_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
-    results = []
 
-    for sym in symbol_list:
+    def scan_single_symbol(sym: str) -> Optional[Dict[str, Any]]:
         try:
             sig = SignalGenerator.analyze_ticker(sym)
             if not sig or not sig.trade:
-                continue
+                return None
 
             tr = sig.trade
             ov = sig.overview
@@ -139,26 +193,26 @@ def scan_markets(
             # Filter early
             if action != "ALL":
                 if action == "SELL" and "SELL" not in tr.action:
-                    continue
+                    return None
                 if action == "BUY" and "BUY" not in tr.action:
-                    continue
+                    return None
 
             if tr.probability_of_profit_pct < min_pop:
-                continue
+                return None
             if tr.return_on_capital_pct < min_roc:
-                continue
+                return None
             if ov.iv_rank_1y < min_iv_rank:
-                continue
+                return None
             if tr.dte > max_dte:
-                continue
+                return None
 
-            # Moving averages from symbol history (period 3mo for fast fetch)
-            import yfinance as yf
-            ticker_obj = yf.Ticker(sym)
-            hist = ticker_obj.history(period="3mo")
-            ema_20 = float(hist['Close'].ewm(span=20).mean().iloc[-1]) if len(hist) >= 20 else ov.spot_price
-            ema_50 = float(hist['Close'].ewm(span=50).mean().iloc[-1]) if len(hist) >= 50 else ov.spot_price
-            ema_200 = float(hist['Close'].ewm(span=200).mean().iloc[-1]) if len(hist) >= 150 else ema_50
+            # Technical indicators
+            tech = calculate_technical_indicators(sym, ov.spot_price)
+            ema_20 = tech["ema_20"]
+            ema_50 = tech["ema_50"]
+            ema_200 = tech["ema_200"]
+            rsi = tech["rsi"]
+            vrp_spread = round((ov.current_iv_estimate - ov.historical_vol_30d) * 100.0, 2)
 
             # EVALUATE MULTI-FACTOR CONFIDENCE RATING
             conf = ConfidenceEngine.evaluate_trade(
@@ -183,7 +237,7 @@ def scan_markets(
             )
 
             if conf.total_score < min_confidence:
-                continue
+                return None
 
             # Position Sizing recommendations
             sizing_half_kelly = PositionSizer.calculate_sizing(
@@ -210,12 +264,12 @@ def scan_markets(
                     ema_20=ema_20,
                     ema_50=ema_50,
                     ema_200=ema_200,
-                    rsi=50.0,
+                    rsi=rsi,
                 )
             except Exception:
                 pass
 
-            results.append({
+            return {
                 "symbol": sig.symbol,
                 "spot_price": round(ov.spot_price, 2),
                 "historical_vol_30d": round(ov.historical_vol_30d * 100.0, 1),
@@ -247,17 +301,37 @@ def scan_markets(
                 "net_theta_daily": tr.net_theta_daily_dollar,
                 "leverage_factor": tr.leverage_factor,
                 "reasoning": tr.reasoning,
-                # CONFIDENCE METRICS
+                # TECHNICAL INDICATORS
+                "rsi": rsi,
+                "ema_20": ema_20,
+                "ema_50": ema_50,
+                "ema_200": ema_200,
+                "vrp_spread": vrp_spread,
+                # CONFIDENCE METRICS & 6 SUB-SCORES
                 "confidence_score": conf.total_score,
                 "confidence_grade": conf.grade,
                 "confidence_verdict": conf.verdict,
+                "vrp_score": conf.vrp_score,
+                "gex_alignment_score": conf.gex_alignment_score,
+                "trend_score": conf.trend_score,
+                "pop_score": conf.pop_score,
+                "liquidity_score": conf.liquidity_score,
+                "macro_buffer_score": conf.macro_buffer_score,
                 "strengths": conf.strengths,
                 "risks": conf.risks,
                 "sizing": sizing_half_kelly,
                 "optimal_strategy": opt_strat,
-            })
-        except Exception as e:
-            continue
+            }
+        except Exception:
+            return None
+
+    results = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        future_map = {executor.submit(scan_single_symbol, sym): sym for sym in symbol_list}
+        for future in concurrent.futures.as_completed(future_map):
+            trade_res = future.result()
+            if trade_res is not None:
+                results.append(trade_res)
 
     # Sort descending by Confidence Score
     results.sort(key=lambda x: x["confidence_score"], reverse=True)
@@ -950,13 +1024,15 @@ def get_asymmetric_setups(
             try:
                 sig = SignalGenerator.analyze_ticker(sym)
                 if sig and sig.overview:
-                    iv_rank = sig.overview.iv_rank
+                    iv_rank = sig.overview.iv_rank_1y
                     spot = sig.overview.spot_price
-                    ema_20 = sig.overview.ema_20
-                    ema_50 = sig.overview.ema_50
-                    rsi = sig.overview.rsi
                 if sig and sig.gamma_profile:
-                    net_gex = sig.gamma_profile.net_gex
+                    net_gex = sig.gamma_profile.net_gex_dollar_1pct
+
+                tech = calculate_technical_indicators(sym, spot)
+                ema_20 = tech["ema_20"]
+                ema_50 = tech["ema_50"]
+                rsi = tech["rsi"]
             except Exception:
                 pass
 

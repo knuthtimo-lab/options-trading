@@ -28,6 +28,21 @@ class ConfidenceReport:
     risks: list[str]
     verdict: str
 
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "total_score": self.total_score,
+            "grade": self.grade,
+            "vrp_score": self.vrp_score,
+            "gex_alignment_score": self.gex_alignment_score,
+            "trend_score": self.trend_score,
+            "pop_score": self.pop_score,
+            "liquidity_score": self.liquidity_score,
+            "macro_buffer_score": self.macro_buffer_score,
+            "strengths": self.strengths,
+            "risks": self.risks,
+            "verdict": self.verdict,
+        }
+
 
 class ConfidenceEngine:
     @classmethod
@@ -212,19 +227,21 @@ class ConfidenceEngine:
             risks.append("Geringer Prämientrag: Spread könnte durch Transaktionskosten belastet werden.")
 
         # -------------------------------------------------------------
-        # 6. Macro Volatility Climate (max 10 pts)
+        # 6. Macro Volatility Climate (max 5 pts)
         # -------------------------------------------------------------
-        macro_score = 7.0
+        macro_score = 3.5
         if 13.0 <= vix_level <= 24.0:
-            macro_score = 10.0
+            macro_score = 5.0
             strengths.append(f"Ideales Makro-Volatilitätsumfeld (VIX bei {vix_level:.1f}).")
         elif vix_level > 32.0:
-            macro_score = 3.0
+            macro_score = 1.5
             risks.append(f"Erhöhter VIX ({vix_level:.1f}): Makro-Crashrisiko erfordert strikte Stop-Loss-Disziplin.")
+        else:
+            macro_score = 3.5
 
-        # TOTAL SCORE & GRADE
+        # TOTAL SCORE & GRADE (sum of 6 sub-scores max 100)
         total_raw = vrp_score + gex_score + trend_score + pop_score + liq_score + macro_score
-        total_score = round(max(10.0, min(99.0, total_raw)), 1)
+        total_score = round(max(10.0, min(100.0, total_raw)), 1)
 
         if total_score >= 90.0:
             grade = "A+"

@@ -100,6 +100,8 @@ class DealerGreeksEngine:
                 'strike': strike,
                 'option_type': opt_type,
                 'oi': oi,
+                'T': T,
+                'sigma': sigma,
                 'call_gex': call_gex,
                 'put_gex': put_gex,
                 'net_gex': net_gex,
@@ -137,18 +139,40 @@ class DealerGreeksEngine:
         puts = df_metrics[df_metrics['option_type'].isin(['p', 'put'])]
         put_wall = float(puts.loc[puts['put_gex'].abs().idxmax()]['strike']) if not puts.empty else spot_price
 
-        # Zero Gamma Flip Point
-        # Aggregate Net GEX by strike
-        strike_gex = df_metrics.groupby('strike')['net_gex'].sum().sort_index()
-        cum_gex = strike_gex.cumsum()
+        # Zero Gamma Flip Point (spot price root where net GEX crosses 0)
+        # Evaluates Net GEX across a grid of spot prices around spot_price * [0.7, 1.3]
         zero_gamma_strike = None
-        # Find where cumulative gex crosses 0
-        neg_strikes = cum_gex[cum_gex < 0].index
-        pos_strikes = cum_gex[cum_gex >= 0].index
-        if len(neg_strikes) > 0 and len(pos_strikes) > 0:
-            zero_gamma_strike = float((neg_strikes[-1] + pos_strikes[0]) / 2.0)
-        elif len(pos_strikes) > 0:
-            zero_gamma_strike = float(pos_strikes[0])
+        try:
+            grid_spots = np.linspace(spot_price * 0.7, spot_price * 1.3, 121)
+            S_grid = grid_spots[:, np.newaxis]
+
+            K_arr = df_metrics['strike'].to_numpy(dtype=float)[np.newaxis, :]
+            T_arr = df_metrics['T'].to_numpy(dtype=float)[np.newaxis, :]
+            sigma_arr = df_metrics['sigma'].to_numpy(dtype=float)[np.newaxis, :]
+            oi_arr = df_metrics['oi'].to_numpy(dtype=float)[np.newaxis, :]
+            sign_arr = np.where(df_metrics['option_type'].isin(['c', 'call']), 1.0, -1.0)[np.newaxis, :]
+
+            sigma_sqrt_T = sigma_arr * np.sqrt(T_arr)
+            d1 = (np.log(S_grid / K_arr) + (risk_free_rate - dividend_yield + 0.5 * sigma_arr**2) * T_arr) / sigma_sqrt_T
+            phi_d1 = (1.0 / np.sqrt(2.0 * np.pi)) * np.exp(-0.5 * d1**2)
+            dollar_gamma_contract = S_grid * np.exp(-dividend_yield * T_arr) * phi_d1 / sigma_sqrt_T
+            net_gex_grid = np.sum(sign_arr * oi_arr * dollar_gamma_contract, axis=1)
+
+            zero_crossings = []
+            for i in range(len(grid_spots) - 1):
+                g1 = net_gex_grid[i]
+                g2 = net_gex_grid[i + 1]
+                if g1 == 0:
+                    zero_crossings.append(float(grid_spots[i]))
+                elif g1 * g2 < 0:
+                    s1, s2 = grid_spots[i], grid_spots[i + 1]
+                    s_zero = s1 - g1 * (s2 - s1) / (g2 - g1)
+                    zero_crossings.append(float(s_zero))
+
+            if zero_crossings:
+                zero_gamma_strike = float(min(zero_crossings, key=lambda z: abs(z - spot_price)))
+        except Exception:
+            zero_gamma_strike = None
 
         if net_gex_dollar > 0:
             regime = "POSITIVE_GAMMA"
