@@ -163,3 +163,6 @@ cd C:\Users\timo\Documents\options-trading
    * Interaktive Übersicht über alle 1.462 realisierten Trades mit Suche und Sortierung.
 4. **Auto-Refresh:**
    * Live-Modus mit automatischem Refresh alle 15s / 30s / 60s oder manuellem Scan per Knopfdruck.
+## 🚀 Live Demo
+Die Web-App ist live auf Vercel erreichbar:
+👉 **[https://options-trading-sandy.vercel.app](https://options-trading-sandy.vercel.app)**
