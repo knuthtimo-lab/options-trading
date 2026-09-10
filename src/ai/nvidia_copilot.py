@@ -52,20 +52,75 @@ class NvidiaQuantCopilot:
             return cls._model_override
         return os.getenv("NVIDIA_MODEL", DEFAULT_MODEL)
 
+    STOPWORDS = {
+        'DER', 'DIE', 'DAS', 'DEN', 'DEM', 'DES', 'EIN', 'EINE', 'EINER', 'EINEM', 'EINEN', 'EINES',
+        'UND', 'ODER', 'ABER', 'DENN', 'DOCH', 'WEIL', 'WENN', 'DASS', 'ALS', 'WIE', 'OB',
+        'FÜR', 'FUR', 'MIT', 'VON', 'BEI', 'NACH', 'ZU', 'ZUM', 'ZUR', 'AUF', 'AUS', 'IN', 'IM', 'AN', 'AM',
+        'VOR', 'HINTER', 'ÜBER', 'UBER', 'UNTER', 'NEBEN', 'ZWISCHEN', 'DURCH', 'GEGEN', 'OHNE', 'UM',
+        'IST', 'SIND', 'WAR', 'WAREN', 'WIRD', 'WERDEN', 'HAT', 'HATTE', 'HABEN', 'KANN', 'KÖNNEN', 'KONNTE',
+        'MUSS', 'MÜSSEN', 'MUSSTE', 'SOLL', 'SOLLTE', 'SOLLTEN', 'WILL', 'WOLLEN', 'WOLLTE', 'MÖCHTE', 'MOCHTE',
+        'GIBT', 'GEHT', 'STEHT', 'LIEGT', 'MACHT', 'TUN', 'SIEHT', 'SCHAUST', 'GUCKST',
+        'GUCK', 'GUCKE', 'SCHAU', 'SCHAUE', 'ZEIG', 'ZEIGE', 'FINDE', 'FINDEN', 'PRÜFE', 'PRUFE',
+        'ANALYSEN', 'ANALYSE', 'ANALYSIERE', 'ANALYSIS', 'CHECK', 'CHECKE', 'TEST', 'TESTE',
+        'BITTE', 'MAL', 'DIR', 'MIR', 'UNS', 'EUCH', 'IHNEN', 'SIE', 'ER', 'ES', 'ICH', 'DU', 'WIR', 'IHR',
+        'HIER', 'DORT', 'DA', 'JETZT', 'NUN', 'HEUTE', 'GESTERN', 'MORGEN', 'TAG', 'TAGE', 'WOCHE', 'MONAT',
+        'KURS', 'PREIS', 'TREND', 'CALL', 'CALLS', 'PUT', 'PUTS', 'OPTION', 'OPTIONEN', 'GREEKS', 'GRIECHEN',
+        'SPREAD', 'SPREADS', 'TRADE', 'TRADES', 'TRADING', 'BUY', 'SELL', 'LONG', 'SHORT', 'HOLD',
+        'WALL', 'WALLS', 'NET', 'GEX', 'OI', 'IV', 'RSI', 'EMA', 'SMA', 'MACD', 'DTE', 'ATM', 'ITM', 'OTM',
+        'AI', 'KI', 'API', 'KEY', 'MODEL', 'MODELL', 'NVIDIA', 'NIM', 'DEPO', 'PORTFOLIO', 'BACKTEST', 'CASH',
+        'WAS', 'WER', 'WO', 'WANN', 'WARUM', 'WIESO', 'WOHIN', 'WOHER', 'WELCHE', 'WELCHER', 'WELCHES',
+        'GUT', 'SCHLECHT', 'BESSER', 'MEHR', 'WENIGER', 'VIEL', 'SEHR', 'NICHT', 'KEIN', 'KEINE', 'JA', 'NEIN',
+        'AUCH', 'NOCH', 'SCHON', 'NUR', 'WIEDER', 'IMMER', 'NIE', 'ALLES', 'ETWAS', 'NICHTS',
+        'THE', 'A', 'AN', 'AND', 'OR', 'BUT', 'NOR', 'FOR', 'YET', 'SO', 'AT', 'BY', 'FROM', 'IN', 'INTO', 'OF',
+        'ON', 'TO', 'WITH', 'ABOUT', 'AGAINST', 'BETWEEN', 'THROUGH', 'DURING', 'BEFORE', 'AFTER', 'ABOVE', 'BELOW',
+        'IS', 'AM', 'ARE', 'WAS', 'WERE', 'BE', 'BEEN', 'BEING', 'HAVE', 'HAS', 'HAD', 'DO', 'DOES', 'DID',
+        'WILL', 'WOULD', 'SHALL', 'SHOULD', 'CAN', 'COULD', 'MAY', 'MIGHT', 'MUST',
+        'HOW', 'WHAT', 'WHICH', 'WHO', 'WHOM', 'WHOSE', 'WHY', 'WHERE', 'WHEN',
+        'THIS', 'THAT', 'THESE', 'THOSE', 'MY', 'YOUR', 'HIS', 'HER', 'ITS', 'OUR', 'THEIR',
+        'I', 'YOU', 'HE', 'SHE', 'IT', 'WE', 'THEY', 'ME', 'HIM', 'HER', 'US', 'THEM',
+        'LOOK', 'SEE', 'SHOW', 'TELL', 'GIVE', 'GET', 'KNOW', 'THINK', 'TAKE', 'MAKE',
+        'STOCK', 'STOCKS', 'PRICE', 'PRICES', 'CHART', 'HIGH', 'LOW', 'OPEN', 'CLOSE'
+    }
+
     @classmethod
     def extract_symbols_from_prompt(cls, prompt: str) -> List[str]:
-        """Extracts valid uppercase stock tickers from user message."""
-        common_symbols = ["SPY", "QQQ", "AAPL", "NVDA", "TSLA", "AMD", "META", "MSFT", "AMZN", "GOOGL", "IWM"]
+        """Extracts valid stock tickers from user message, handling both uppercase, lowercase and contextual phrases."""
         found = []
-        prompt_upper = prompt.upper()
-        for sym in common_symbols:
-            # Match word boundary or standalone symbol
-            if re.search(rf"\b{sym}\b", prompt_upper):
+        
+        # 1. Look for explicit dollar sign notation ($GRAB, $SPY, $NVDA)
+        for m in re.finditer(r'\$([A-Za-z]{1,5})\b', prompt):
+            sym = m.group(1).upper()
+            if sym not in cls.STOPWORDS:
                 found.append(sym)
-        if not found:
-            # Fallback to SPY and NVDA for general market questions
-            found = ["SPY", "NVDA"]
-        return list(dict.fromkeys(found))[:3]
+
+        # 2. Contextual indicators like 'guck dir mal GRAB an', 'analysiere grab', 'aktie grab', 'bei grab'
+        context_patterns = [
+            r'(?:guck\s+dir\s+(?:mal\s+)?|schau\s+dir\s+(?:mal\s+)?|analysiere\s+|wie\s+steht\s+|aktie\s+|ticker\s+|symbol\s+|für\s+|fuer\s+|bei\s+|zu\s+|über\s+|ueber\s+)([A-Za-z]{1,5})\b',
+        ]
+        for pat in context_patterns:
+            for m in re.finditer(pat, prompt, re.IGNORECASE):
+                sym = m.group(1).upper()
+                if sym not in cls.STOPWORDS:
+                    found.append(sym)
+
+        # 3. Known major universe check
+        known_universe = ["SPY", "QQQ", "AAPL", "NVDA", "TSLA", "AMD", "META", "MSFT", "AMZN", "GOOGL", "IWM", "PLTR", "ARM", "SMCI", "COIN", "GRAB", "INTC", "BABA", "DIS", "NFLX", "UBER"]
+        for sym in known_universe:
+            if re.search(rf"\b{sym}\b", prompt, re.IGNORECASE):
+                found.append(sym)
+
+        # 4. Standalone uppercase words of 2-5 chars (e.g. GRAB, SOFI, RIVN) not in stopwords
+        tokens = re.findall(r'\b([A-Za-z]{2,5})\b', prompt)
+        for tok in tokens:
+            u = tok.upper()
+            if tok.isupper() and u not in cls.STOPWORDS:
+                found.append(u)
+
+        dedup = list(dict.fromkeys(found))
+        if not dedup:
+            # Fallback only when no specific ticker was mentioned
+            dedup = ["SPY"]
+        return dedup[:3]
 
     @classmethod
     def gather_live_market_context(cls, symbols: List[str]) -> Dict[str, Any]:
@@ -73,9 +128,9 @@ class NvidiaQuantCopilot:
         context_data = {}
         for sym in symbols:
             try:
-                # 1. Price & Technical Indicators via yfinance
+                # 1. Price & Technical Indicators via yfinance (3mo for rapid fetching)
                 ticker = yf.Ticker(sym)
-                hist = ticker.history(period="6mo")
+                hist = ticker.history(period="3mo")
                 if hist.empty:
                     continue
 
@@ -101,8 +156,28 @@ class NvidiaQuantCopilot:
                 # 3. Unusual Greeks & Gamma Magnet
                 unusual = UnusualGreeksEngine.analyze_ticker_anomalies(sym)
 
-                # 4. Strategy Setup
+                # 4. Strategy Setup & Dynamic Strikes
                 signal = SignalGenerator.analyze_ticker(sym)
+                regime = signal.regime if signal else None
+                trade = signal.trade if signal else None
+                
+                strategy_name = trade.strategy_name if trade else (regime.strategy_type if regime else "NEUTRAL_WAIT")
+                action = trade.action if trade else (regime.action if regime else "NONE")
+                legs_summary = trade.legs_summary if trade else "NONE"
+                
+                # Dynamic strikes tailored to ticker spot price level if no fixed spread exists
+                if legs_summary == "NONE" and spot > 0:
+                    width = 5.0 if spot > 100 else (2.5 if spot > 30 else (1.0 if spot > 10 else 0.5))
+                    put_wall = unusual.put_support_strike if unusual and unusual.put_support_strike else round(spot * 0.95, 2)
+                    call_wall = unusual.call_resistance_strike if unusual and unusual.call_resistance_strike else round(spot * 1.05, 2)
+                    if "BUY" in action:
+                        legs_summary = f"Long Put: ${put_wall} | Long Call: ${call_wall}"
+                    else:
+                        short_p = round(put_wall, 2)
+                        long_p = round(put_wall - width, 2)
+                        short_c = round(call_wall, 2)
+                        long_c = round(call_wall + width, 2)
+                        legs_summary = f"Puts: {short_p}/{long_p} | Calls: {short_c}/{long_c}"
 
                 context_data[sym] = {
                     "spot_price": round(spot, 2),
@@ -123,9 +198,9 @@ class NvidiaQuantCopilot:
                     "call_resistance": unusual.call_resistance_strike if unusual else None,
                     "put_support": unusual.put_support_strike if unusual else None,
                     "anomalies_detected": [a.description for a in unusual.anomalies[:3]] if unusual else [],
-                    "recommended_strategy": signal.trade.strategy_name if signal and signal.trade else "NEUTRAL_WAIT",
-                    "action": signal.trade.action if signal and signal.trade else "NONE",
-                    "legs": signal.trade.legs_summary if signal and signal.trade else "NONE",
+                    "recommended_strategy": strategy_name,
+                    "action": action,
+                    "legs": legs_summary,
                 }
             except Exception as e:
                 continue
@@ -148,7 +223,7 @@ class NvidiaQuantCopilot:
         # Build comprehensive quantitative system prompt
         context_json = json.dumps(market_context, indent=2)
 
-        system_prompt = f"""Du bist die institutional quantitative KI-Copilot für Optionen-Trading und Derivate-Analyse, angetrieben von NVIDIAs 120B/340B Supermodel-Architektur.
+        system_prompt = f"""Du bist der institutionelle quantitative KI-Copilot für Optionen-Trading und Derivate-Analyse, angetrieben von NVIDIAs 120B/340B Supermodel-Architektur.
 Du hast direkten Zugriff auf Yahoo Finance Live-Kurse, technische Indikatoren (EMA 20/50/200, RSI 14), 1. & 2. Ordnung Griechen (Delta, Gamma, Vanna, Charm, Volga), Dealer Net GEX, ungewöhnliches Optionsvolumen und Gamma-Magnet-Pinning-Strikes.
 
 AKTUELLE LIVE-MARKT-DATEN & QUANTITATIVE ANALYSE (DIREKT AUS YAHOO FINANCE & DEM GREEKS ENGINE):
@@ -156,13 +231,14 @@ AKTUELLE LIVE-MARKT-DATEN & QUANTITATIVE ANALYSE (DIREKT AUS YAHOO FINANCE & DEM
 
 RICHTLINIEN FÜR DEINE ANTWORTEN:
 1. Sei präzise, quantitativ fundiert und professionell wie ein Senior Volatility Trader bei einem Hedgefonds.
-2. Nutze immer die konkreten Zahlen aus dem Datenkontext (z.B. exakter Spot-Kurs, EMA-Level, RSI, Net GEX, Gamma Magnet Strike, DTE und Strikes).
-3. Erkläre bei Nachfragen verständlich:
+2. Beziehe dich IMMER exakt auf das vom Benutzer angefragte Symbol (z.B. {symbols[0] if symbols else 'den Markt'}).
+3. Nutze immer die konkreten Zahlen aus dem Datenkontext (exakter Spot-Kurs, EMA-Level, RSI, Net GEX, Gamma Magnet Strike, DTE und Strikes).
+4. Erkläre bei Nachfragen verständlich:
    - Warum ein Gamma-Magnet den Kurs anzieht (Dealer Delta-Hedging Pinning).
    - Wie sich Vanna und Charm auf den Trade auswirken.
    - Warum Defined-Risk Spreads (Credit vs. Debit) nackten Optionen vorzuziehen sind.
-4. Gib konkrete Handlungsoptionen mit Einstieg, Stop-Loss und Take-Profit (45-50%).
-5. Antworte auf Deutsch im professionellen Markdown-Format mit Hervorhebungen.
+5. Gib konkrete Handlungsoptionen mit Einstieg, Stop-Loss und Take-Profit (45-50%).
+6. Antworte auf Deutsch im professionellen Markdown-Format direkt mit deiner Analyse. Keine internen Denkprozesse voranstellen.
 """
 
         messages = [{"role": "system", "content": system_prompt}]
@@ -187,7 +263,7 @@ RICHTLINIEN FÜR DEINE ANTWORTEN:
             "messages": messages,
             "temperature": 0.2,
             "top_p": 0.7,
-            "max_tokens": 1024,
+            "max_tokens": 768,
             "stream": False,
         }
 
@@ -201,15 +277,23 @@ RICHTLINIEN FÜR DEINE ANTWORTEN:
                   "User-Agent": "OptionsTrading-NvidiaCopilot/2.0"
                 }
             )
-            with urllib.request.urlopen(req, timeout=60) as resp:
+            with urllib.request.urlopen(req, timeout=25) as resp:
                 resp_json = json.loads(resp.read().decode("utf-8"))
-                reply_text = resp_json["choices"][0]["message"]["content"]
+                raw_reply = resp_json["choices"][0]["message"]["content"]
+                
+                # Clean up reasoning tokens if model outputs thinking blocks
+                reply_text = re.sub(r"<think>.*?</think>", "", raw_reply, flags=re.DOTALL).strip()
+                if reply_text.startswith("Here's a thinking process:"):
+                    parts = re.split(r"\n\n(?=[A-Z0-9#])", reply_text)
+                    if len(parts) > 1:
+                        reply_text = "\n\n".join(parts[1:]).strip()
+
                 return {
                     "status": "SUCCESS",
                     "model": model_name,
                     "symbols_analyzed": symbols,
                     "market_context": market_context,
-                    "reply": reply_text,
+                    "reply": reply_text if reply_text else raw_reply,
                 }
         except urllib.error.HTTPError as e:
             err_msg = e.read().decode("utf-8")
@@ -229,9 +313,9 @@ RICHTLINIEN FÜR DEINE ANTWORTEN:
 
     @classmethod
     def _generate_offline_analysis(cls, prompt: str, symbols: List[str], ctx: Dict[str, Any]) -> str:
-        """Fallback quantitative intelligence engine when API key is awaiting configuration."""
+        """Fallback quantitative intelligence engine when API key is awaiting configuration or timing out."""
         if not symbols or not ctx:
-            return "Bitte stelle eine Frage zu einem konkreten Ticker wie SPY, QQQ, NVDA, AAPL oder TSLA."
+            return "Bitte stelle eine Frage zu einem konkreten Ticker wie GRAB, SPY, QQQ, NVDA, AAPL oder TSLA."
 
         sym = symbols[0]
         data = ctx.get(sym, {})
@@ -241,6 +325,7 @@ RICHTLINIEN FÜR DEINE ANTWORTEN:
         magnet = data.get("gamma_magnet", "---")
         pull = data.get("magnet_pull_force", "---")
         strategy = data.get("recommended_strategy", "---")
+        action = data.get("action", "---")
         legs = data.get("legs", "---")
         iv_rank = data.get("iv_rank", "---")
 
@@ -249,24 +334,24 @@ RICHTLINIEN FÜR DEINE ANTWORTEN:
         except (ValueError, TypeError):
             rsi_val = 50.0
 
+        anom_line = f"- **Erkannte Anomalie:** *{data['anomalies_detected'][0]}*" if data.get('anomalies_detected') else "- **Volumen-Status:** Normales institutionelles Orderbuch ohne extreme Block-Sweeps."
+
         return f"""### 🤖 NVIDIA Quant-Analyse für **{sym}**
 
 **1. Live Markt- & Indikatoren-Profil (Yahoo Finance):**
 - **Aktueller Kurs:** `${spot}` ({data.get('day_change_pct', 0.0):+}% heute)
 - **Trend-Status:** `{trend}` (EMA 20: `${data.get('ema_20')}`, EMA 50: `${data.get('ema_50')}`, EMA 200: `${data.get('ema_200')}`)
-- **RSI (14):** `{rsi}` ({'Überverkauft' if rsi_val < 35 else 'Überkauft' if rsi_val > 70 else 'Neutral'})
+- **RSI (14):** `{rsi}` ({'Stark überverkauft' if rsi_val < 30 else 'Überverkauft' if rsi_val < 40 else 'Überkauft' if rsi_val > 70 else 'Neutral'})
 - **IV Rank:** `{iv_rank}%` (VIX: `{data.get('vix_level')}`)
 
 **2. Dealer Greeks & Ungewöhnliches Volumen:**
 - **Gamma Magnet Strike:** **`${magnet}`** (Anziehungskraft: `{pull}`)
 - **Dynamischer Support (Put Wall):** `${data.get('put_support')}`
 - **Dynamischer Widerstand (Call Wall):** `${data.get('call_resistance')}`
-{f'- **Erkannte Anomalie:** *{data["anomalies_detected"][0]}*' if data.get('anomalies_detected') else ''}
+{anom_line}
 
 **3. Quantitatives Handels-Setup:**
-- **Empfehlung:** `{strategy}` ({data.get('action')})
+- **Empfehlung:** `{strategy}` ({action})
 - **Struktur:** `{legs}`
-- **Begründung:** Der Kurs wird durch den Gamma-Magneten bei `${magnet}` stabilisiert. Bei einem IV-Rank von `{iv_rank}%` bietet ein definierter Credit Spread das höchste statistische Edge ohne ungedecktes Tail-Risiko.
-
-> *Hinweis: Trage deinen persönlichen **NVIDIA API Key** in den Einstellungen ein, um Live-Streaming-Antworten des NVIDIA 120B/340B Nemotron-Modells zu aktivieren.*
+- **Begründung:** Der Kurs von {sym} (${spot}) orientiert sich stark am Gamma-Magneten bei `${magnet}` (Put Support `${data.get('put_support')}` / Call Resistance `${data.get('call_resistance')}`). Bei einem IV-Rank von `{iv_rank}%` und einem RSI(14) von `{rsi}` bietet ein risiko-definiertes Setup um die Support-Zone statistisch das höchste Risk/Reward-Verhältnis.
 """
