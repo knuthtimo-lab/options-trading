@@ -266,8 +266,10 @@ def get_gamma_profile_by_strike(symbol: str):
         
         strike_metrics = []
         for strike, group in df_clean.groupby('strike'):
-            call_oi = float(group[group['option_type'].isin(['c', 'call'])]['open_interest'].sum())
-            put_oi = float(group[group['option_type'].isin(['p', 'put'])]['open_interest'].sum())
+            call_oi_val = group[group['option_type'].isin(['c', 'call'])]['open_interest'].sum()
+            put_oi_val = group[group['option_type'].isin(['p', 'put'])]['open_interest'].sum()
+            call_oi = float(np.nan_to_num(call_oi_val, nan=0.0))
+            put_oi = float(np.nan_to_num(put_oi_val, nan=0.0))
             
             # Approximate GEX for strike
             gamma = 1.0 / (spot_price * 0.20 * np.sqrt(30/365.0) * np.sqrt(2 * np.pi) + 1e-6)
@@ -278,9 +280,9 @@ def get_gamma_profile_by_strike(symbol: str):
                 "strike": float(strike),
                 "call_oi": int(call_oi),
                 "put_oi": int(put_oi),
-                "call_gex_m": round(gex_call, 2),
-                "put_gex_m": round(gex_put, 2),
-                "net_gex_m": round(gex_call + gex_put, 2),
+                "call_gex_m": round(float(np.nan_to_num(gex_call, nan=0.0)), 2),
+                "put_gex_m": round(float(np.nan_to_num(gex_put, nan=0.0)), 2),
+                "net_gex_m": round(float(np.nan_to_num(gex_call + gex_put, nan=0.0)), 2),
             })
 
         strike_metrics.sort(key=lambda x: x['strike'])
@@ -299,23 +301,19 @@ def get_gamma_profile_by_strike(symbol: str):
 def get_payoff_diagram(
     strategy_name: str = Query("BULL_PUT_SPREAD"),
     spot_price: float = Query(500.0),
-    entry_price: float = Query(2.50),
-    short_strike: Optional[float] = Query(None),
-    long_strike: Optional[float] = Query(None),
-    dte: int = Query(30),
-    iv: float = Query(0.20),
+    short_strike: float = Query(490.0),
+    long_strike: float = Query(480.0),
+    entry_credit: float = Query(2.50),
     contracts: int = Query(1),
 ):
-    """Calculates evaluation points for interactive PnL Payoff charts."""
+    """Calculates interactive PnL Payoff Curve for visual canvas."""
     try:
-        data = PayoffVisualizer.generate_payoff_data(
+        data = PayoffVisualizer.generate_payoff_curve(
             strategy_name=strategy_name,
             spot_price=spot_price,
-            entry_price=entry_price,
             short_strike=short_strike,
             long_strike=long_strike,
-            dte=dte,
-            iv=iv,
+            entry_credit=entry_credit,
             contracts=contracts,
         )
         return data
@@ -326,7 +324,7 @@ def get_payoff_diagram(
 @app.get("/api/chain/{symbol}")
 def get_options_chain_with_greeks(
     symbol: str,
-    expiration: Optional[str] = None,
+    expiration: Optional[str] = Query(None, description="Expiration date YYYY-MM-DD"),
     opt_type: str = Query("all", description="all, call, or put"),
 ):
     """Returns full options chain with 1st and 2nd order Greeks with caching."""
@@ -354,7 +352,7 @@ def get_options_chain_with_greeks(
             df_exp = df_exp[df_exp['option_type'].isin(["p", "put"])]
 
         dte = int(df_exp['dte'].iloc[0]) if not df_exp.empty else 30
-        T = dte / 365.0
+        T = max(1, dte) / 365.0
         r = 0.045
         q = 0.015
 
@@ -362,27 +360,44 @@ def get_options_chain_with_greeks(
         for _, r_data in df_exp.iterrows():
             k = float(r_data['strike'])
             o_type = str(r_data['option_type']).lower()
-            iv = float(r_data['implied_volatility'])
+            iv_raw = r_data.get('implied_volatility', 0.25)
+            iv = float(iv_raw) if (pd.notna(iv_raw) and not np.isnan(float(iv_raw))) else 0.25
+            if iv <= 0.001 or np.isnan(iv):
+                iv = 0.25
             greeks = BlackScholesEngine.calculate_all_greeks(o_type, spot_price, k, T, r, iv, q)
+
+            bid_raw = r_data.get('bid', 0.0)
+            bid = float(bid_raw) if (pd.notna(bid_raw) and not np.isnan(float(bid_raw))) else 0.0
+            ask_raw = r_data.get('ask', 0.0)
+            ask = float(ask_raw) if (pd.notna(ask_raw) and not np.isnan(float(ask_raw))) else 0.0
+            mid_raw = r_data.get('mid', 0.0)
+            mid = float(mid_raw) if (pd.notna(mid_raw) and not np.isnan(float(mid_raw))) else (bid + ask) / 2.0
+            last_raw = r_data.get('last', mid)
+            last = float(last_raw) if (pd.notna(last_raw) and not np.isnan(float(last_raw))) else mid
+            oi_raw = r_data.get('open_interest', 0)
+            oi = int(float(oi_raw)) if (pd.notna(oi_raw) and not np.isnan(float(oi_raw))) else 0
+            vol_raw = r_data.get('volume', 0)
+            vol = int(float(vol_raw)) if (pd.notna(vol_raw) and not np.isnan(float(vol_raw))) else 0
 
             rows.append({
                 "strike": k,
+                "type": o_type.upper(),
                 "option_type": o_type,
-                "bid": float(r_data['bid']),
-                "ask": float(r_data['ask']),
-                "mid": round(float(r_data['mid']), 2),
-                "last": float(r_data['last']),
+                "bid": round(bid, 2),
+                "ask": round(ask, 2),
+                "mid": round(mid, 2),
+                "last": round(last, 2),
                 "iv_pct": round(iv * 100.0, 1),
-                "open_interest": int(r_data['open_interest']),
-                "volume": int(r_data['volume']),
-                "delta": round(greeks.delta, 3),
-                "gamma": round(greeks.gamma, 4),
-                "vega": round(greeks.vega, 3),
-                "theta_daily": round(greeks.theta, 3),
-                "vanna": round(greeks.vanna, 3),
-                "charm": round(greeks.charm, 4),
-                "volga": round(greeks.volga, 4),
-                "speed": round(greeks.speed, 5),
+                "open_interest": oi,
+                "volume": vol,
+                "delta": round(float(np.nan_to_num(greeks.delta, nan=0.0)), 3),
+                "gamma": round(float(np.nan_to_num(greeks.gamma, nan=0.0)), 4),
+                "vega": round(float(np.nan_to_num(greeks.vega, nan=0.0)), 3),
+                "theta_daily": round(float(np.nan_to_num(greeks.theta, nan=0.0)), 3),
+                "vanna": round(float(np.nan_to_num(greeks.vanna, nan=0.0)), 3),
+                "charm": round(float(np.nan_to_num(greeks.charm, nan=0.0)), 4),
+                "volga": round(float(np.nan_to_num(greeks.volga, nan=0.0)), 4),
+                "speed": round(float(np.nan_to_num(greeks.speed, nan=0.0)), 5),
             })
 
         res = {
@@ -566,6 +581,157 @@ def get_unusual_greeks(symbols: str = Query("SPY,QQQ,AAPL,NVDA,TSLA,AMD,META,MSF
 def get_magnet_backtest():
     """Returns backtest results for the Greek Magnet Pinning & Mean-Reversion strategy."""
     res = MagnetBacktestEngine.run_magnet_backtest()
+    return res
+
+
+@app.get("/api/backtest/iterations")
+def get_backtest_iterations():
+    """Returns the results of the 20+ structured backtest iterations."""
+    paths = [
+        BASE_DIR / "backtest_20_iterations.json",
+        BASE_DIR / "data_cache" / "backtest_20_iterations.json",
+        BASE_DIR / "src" / "data" / "backtest_20_iterations.json",
+    ]
+    for p in paths:
+        if p.exists():
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                pass
+    return {"total_iterations": 0, "iterations": []}
+
+
+@app.get("/api/setups/curated")
+def get_curated_flow_setups(
+    symbols: str = Query("SPY,QQQ,AAPL,NVDA,TSLA,AMD,META,MSFT,PLTR", description="Comma-separated tickers")
+):
+    """
+    Curates institutional-grade trade setups based on Unusual Greeks volume,
+    Gamma Magnets, Support/Resistance Walls, and Skew.
+    Includes exact strikes, DTE, estimated profit, and clear exit rules (when to sell / take profit and when to stop loss).
+    """
+    cache_key = f"curated:{symbols}"
+    cached = get_from_cache(cache_key)
+    if cached:
+        return cached
+
+    symbol_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
+    setups = []
+
+    for sym in symbol_list:
+        try:
+            sig = SignalGenerator.analyze_ticker(sym)
+            if not sig or not sig.trade:
+                continue
+
+            tr = sig.trade
+            ov = sig.overview
+            gp = sig.gamma_profile
+            spot = ov.spot_price
+
+            # Check Unusual Greeks volume & magnet
+            try:
+                rep = UnusualGreeksEngine.analyze_ticker_anomalies(sym)
+                anomalies = rep.anomalies if rep else []
+                magnet_strike = rep.primary_magnet_strike if rep else round(spot)
+                magnet_pull = rep.magnet_pull_force if rep else "MODERATE"
+            except Exception:
+                anomalies = []
+                magnet_strike = round(spot)
+                magnet_pull = "MODERATE"
+
+            # Setup Type and Detailed Exit Rules
+            dte = tr.dte
+            short_k = tr.short_strike or round(spot * 0.95, 1)
+            long_k = tr.long_strike or round(short_k * 0.96, 1)
+            entry_credit = tr.entry_limit_price
+            max_profit = tr.max_profit_dollar
+            max_loss = tr.max_loss_dollar
+            roc = tr.return_on_capital_pct
+            pop = tr.probability_of_profit_pct
+
+            # Precise dollar thresholds
+            tp_price = round(entry_credit * 0.50, 2)
+            tp_profit_dollar = round(max_profit * 0.50, 2)
+            sl_price = round(entry_credit * 2.00, 2)
+            sl_loss_dollar = round(entry_credit * 1.00 * 100.0, 2)
+
+            # Construct institutional exit rules
+            when_to_sell = (
+                f"Gewinn mitnehmen bei Erreichen von 50% des max. Credits (Limit-Kauf bei ${tp_price:.2f}, "
+                f"+${tp_profit_dollar:.0f}/Kontrakt) ODER wenn Restlaufzeit 21 DTE erreicht."
+            )
+            
+            when_to_stop = (
+                f"Verlust begrenzen bei 2.0x des Credits (Stop-Order bei ${sl_price:.2f}, "
+                f"-${sl_loss_dollar:.0f}/Kontrakt) ODER wenn Tagesschlusskurs die Put Wall von ${gp.put_wall_strike:.1f} bricht."
+            )
+
+            # Quantitative Rationale based on Greeks & Dealer Flow
+            if "CONDOR" in tr.strategy_name.upper():
+                setup_badge = "GAMMA_MAGNET_PIN"
+                setup_title = f"{sym} Dealer Gamma Magnet Pinning"
+                rationale = (
+                    f"Massives Net GEX (${gp.net_gex_dollar_1pct/1e6:+.2f}M) und Magnet-Strike bei ${magnet_strike:.1f} "
+                    f"erzeugen starken Pinning-Druck. Dealer dämpfen Volatilität zwischen Put Wall (${gp.put_wall_strike:.1f}) "
+                    f"und Call Wall (${gp.call_wall_strike:.1f})."
+                )
+            elif "BULL" in tr.strategy_name.upper():
+                setup_badge = "PUT_WALL_DEFENSE"
+                setup_title = f"{sym} Institutional Put Wall Support"
+                rationale = (
+                    f"Spot (${spot:.2f}) notiert über institutioneller Put Wall (${gp.put_wall_strike:.1f}). "
+                    f"Dealer hedgen bei Dips long underlying shares und stabilisieren den Kurs."
+                )
+            else:
+                setup_badge = "CALL_WALL_FADE"
+                setup_title = f"{sym} Call Wall Resistance Fade"
+                rationale = (
+                    f"Widerstand an Call Wall (${gp.call_wall_strike:.1f}) limitiert Aufwärtspotenzial. "
+                    f"Short Gamma der Dealer dämpft Übertreibungen nach oben ab."
+                )
+
+            setups.append({
+                "symbol": sym,
+                "spot_price": round(spot, 2),
+                "strategy_name": tr.strategy_name,
+                "action": tr.action,
+                "setup_type": setup_badge,
+                "setup_title": setup_title,
+                "magnet_strike": round(magnet_strike, 1),
+                "magnet_pull": magnet_pull,
+                "put_wall": round(gp.put_wall_strike, 1),
+                "call_wall": round(gp.call_wall_strike, 1),
+                "net_gex_m": round(gp.net_gex_dollar_1pct / 1e6, 2),
+                "gamma_regime": gp.gamma_regime,
+                "short_strike": short_k,
+                "long_strike": long_k,
+                "expiration": tr.expiration,
+                "dte": dte,
+                "entry_limit_price": entry_credit,
+                "take_profit_target_price": tp_price,
+                "stop_loss_target_price": sl_price,
+                "max_profit_dollar": max_profit,
+                "max_loss_dollar": max_loss,
+                "return_on_capital_pct": roc,
+                "probability_of_profit_pct": pop,
+                "when_to_sell_rule": when_to_sell,
+                "when_to_stop_rule": when_to_stop,
+                "quant_rationale": rationale,
+                "anomalies_detected": len(anomalies),
+                "legs_summary": tr.legs_summary,
+            })
+        except Exception:
+            continue
+
+    setups.sort(key=lambda x: x["probability_of_profit_pct"], reverse=True)
+    res = {
+        "count": len(setups),
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "setups": setups,
+    }
+    set_in_cache(cache_key, res, ttl_seconds=60)
     return res
 
 
