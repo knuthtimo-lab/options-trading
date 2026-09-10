@@ -29,6 +29,9 @@ from src.strategy.spread_selector import SpreadSelector
 from src.strategy.confidence_engine import ConfidenceEngine
 from src.strategy.paper_portfolio import PaperPortfolio, PositionSizer
 from src.backtest.monte_carlo import MonteCarloSimulator
+from src.engine.unusual_greeks import UnusualGreeksEngine
+from src.backtest.magnet_backtest import MagnetBacktestEngine
+from src.ai.nvidia_copilot import NvidiaQuantCopilot
 
 app = FastAPI(
     title="Quantitative Options Scanner & Web Dashboard",
@@ -452,3 +455,115 @@ def calculate_sizing(data: Dict[str, Any] = Body(...)):
     max_profit = data.get("max_profit", 500.0)
     win_prob = data.get("win_prob_pct", 75.0)
     return PositionSizer.calculate_sizing(account_equity, risk_mode, max_loss, max_profit, win_prob)
+
+
+# -------------------------------------------------------------
+# UNUSUAL GREEKS VOLUME & MAGNET ENDPOINTS
+# -------------------------------------------------------------
+@app.get("/api/greeks/unusual")
+def get_unusual_greeks(symbols: str = Query("SPY,QQQ,AAPL,NVDA,TSLA,AMD,META,MSFT")):
+    """Scans symbols for abnormal Gamma/Vanna/Vega volume and identifies Magnet strikes."""
+    symbol_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
+    reports = []
+    all_anomalies = []
+
+    for sym in symbol_list:
+        try:
+            rep = UnusualGreeksEngine.analyze_ticker_anomalies(sym)
+            if rep:
+                reports.append({
+                    "symbol": rep.symbol,
+                    "spot_price": rep.spot_price,
+                    "primary_magnet_strike": rep.primary_magnet_strike,
+                    "magnet_distance_pct": rep.magnet_distance_pct,
+                    "magnet_pull_force": rep.magnet_pull_force,
+                    "call_resistance_strike": rep.call_resistance_strike,
+                    "put_support_strike": rep.put_support_strike,
+                    "total_gamma_volume_m": rep.total_gamma_volume_m,
+                    "total_vanna_volume_m": rep.total_vanna_volume_m,
+                    "anomaly_count": len(rep.anomalies),
+                })
+                for a in rep.anomalies:
+                    all_anomalies.append({
+                        "symbol": a.symbol,
+                        "strike": a.strike,
+                        "option_type": a.option_type,
+                        "expiration": a.expiration,
+                        "dte": a.dte,
+                        "volume": a.volume,
+                        "open_interest": a.open_interest,
+                        "vol_oi_ratio": a.vol_oi_ratio,
+                        "iv_pct": a.iv_pct,
+                        "anomaly_type": a.anomaly_type,
+                        "gamma_vol_m": a.gamma_vol_m,
+                        "vanna_vol_m": a.vanna_vol_m,
+                        "vega_vol_k": a.vega_vol_k,
+                        "delta_vol_m": a.delta_vol_m,
+                        "significance_score": a.significance_score,
+                        "description": a.description,
+                    })
+        except Exception:
+            continue
+
+    all_anomalies.sort(key=lambda x: x["significance_score"], reverse=True)
+
+    return {
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "structures": reports,
+        "anomalies": all_anomalies[:25],
+    }
+
+
+@app.get("/api/backtest/magnet")
+def get_magnet_backtest():
+    """Returns backtest results for the Greek Magnet Pinning & Mean-Reversion strategy."""
+    res = MagnetBacktestEngine.run_magnet_backtest()
+    return res
+
+
+# -------------------------------------------------------------
+# NVIDIA NIM AI QUANT COPILOT ENDPOINTS
+# -------------------------------------------------------------
+@app.post("/api/ai/chat")
+def ai_chat(data: Dict[str, Any] = Body(...)):
+    """Receives user query, gathers live market tools context, and queries NVIDIA NIM Supermodel."""
+    prompt = data.get("prompt", "")
+    history = data.get("history", [])
+    if not prompt:
+        raise HTTPException(status_code=400, detail="Prompt must not be empty.")
+    
+    res = NvidiaQuantCopilot.chat(user_message=prompt, chat_history=history)
+    return res
+
+
+@app.post("/api/ai/config")
+def set_ai_config(data: Dict[str, Any] = Body(...)):
+    """Updates API key and model preference for the NVIDIA Copilot."""
+    api_key = data.get("api_key")
+    model = data.get("model")
+    if api_key is not None:
+        NvidiaQuantCopilot.set_api_key(api_key)
+    if model is not None:
+        NvidiaQuantCopilot.set_model(model)
+    return {
+        "status": "SUCCESS",
+        "has_api_key": bool(NvidiaQuantCopilot.get_api_key()),
+        "model": NvidiaQuantCopilot.get_model(),
+    }
+
+
+@app.get("/api/ai/config")
+def get_ai_config():
+    """Returns status of the NVIDIA AI Copilot configuration."""
+    api_key = NvidiaQuantCopilot.get_api_key()
+    masked = f"{api_key[:6]}...{api_key[-4:]}" if api_key and len(api_key) > 10 else ("CONFIGURED" if api_key else "NOT_CONFIGURED")
+    return {
+        "has_api_key": bool(api_key),
+        "api_key_status": masked,
+        "model": NvidiaQuantCopilot.get_model(),
+        "available_models": [
+            {"id": "nvidia/nemotron-3-super-120b-a12b", "name": "NVIDIA Nemotron-3 Super 120B (Standard)"},
+            {"id": "nvidia/llama-3.1-nemotron-70b-instruct", "name": "NVIDIA Llama 3.1 Nemotron 70B"},
+            {"id": "nvidia/nemotron-4-340b-instruct", "name": "NVIDIA Nemotron-4 340B Supermodel"},
+        ]
+    }

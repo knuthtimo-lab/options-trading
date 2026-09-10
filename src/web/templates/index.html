@@ -18,6 +18,7 @@
             accentcyan: '#06B6D4',
             accentyellow: '#F59E0B',
             accentred: '#EF4444',
+            accentpurple: '#A855F7',
           }
         }
       }
@@ -25,11 +26,15 @@
   </script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <style>
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: #0B0F19; }
     ::-webkit-scrollbar-thumb { background: #1F2937; border-radius: 3px; }
     ::-webkit-scrollbar-thumb:hover { background: #374151; }
+    .prose-dark p { margin-bottom: 0.5rem; }
+    .prose-dark ul { list-style-type: disc; margin-left: 1.25rem; margin-bottom: 0.5rem; }
+    .prose-dark strong { color: #06B6D4; font-weight: 700; }
   </style>
 </head>
 <body class="bg-darkbg text-gray-100 font-sans min-h-screen flex flex-col antialiased">
@@ -38,15 +43,15 @@
   <header class="border-b border-cardborder bg-cardbg/80 backdrop-blur sticky top-0 z-40">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
       <div class="flex items-center space-x-3">
-        <div class="bg-gradient-to-tr from-accentgreen to-accentcyan p-2 rounded-lg text-black font-black">
+        <div class="bg-gradient-to-tr from-accentgreen via-accentcyan to-accentpurple p-2 rounded-lg text-black font-black">
           <i data-lucide="activity" class="w-6 h-6 text-black"></i>
         </div>
         <div>
           <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
-            QUANT OPTIONS ENGINE
-            <span class="text-xs font-mono uppercase bg-accentgreen/15 text-accentgreen border border-accentgreen/30 px-2 py-0.5 rounded">Gamma & Vanna Live</span>
+            QUANT OPTIONS ENGINE 2.0
+            <span class="text-xs font-mono uppercase bg-accentgreen/15 text-accentgreen border border-accentgreen/30 px-2 py-0.5 rounded">Greeks & AI Live</span>
           </h1>
-          <p class="text-xs text-gray-400">Institutional Regime-Adaptive Volatility & Greek Scanner</p>
+          <p class="text-xs text-gray-400">Institutional Higher-Order Greeks, Magnets & NVIDIA NIM Supermodel</p>
         </div>
       </div>
 
@@ -63,6 +68,10 @@
         </div>
 
         <div class="flex items-center space-x-2">
+          <button onclick="openAiSettingsModal()" class="flex items-center gap-1 bg-purple-950/40 hover:bg-purple-900/50 text-purple-300 border border-purple-700/50 px-2.5 py-1.5 rounded-lg text-xs font-medium transition">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-accentpurple"></i>
+            <span id="header-ai-status">NVIDIA KI</span>
+          </button>
           <select id="auto-refresh-select" class="bg-darkbg border border-cardborder text-xs rounded-lg px-2 py-1.5 text-gray-300 focus:outline-none focus:border-accentcyan">
             <option value="0">Auto: Aus</option>
             <option value="15" selected>Auto: 15s</option>
@@ -78,18 +87,26 @@
     </div>
 
     <!-- NAVIGATION TABS -->
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-8 text-sm">
-      <button onclick="switchTab('scanner')" id="tab-btn-scanner" class="py-2.5 border-b-2 border-accentcyan text-accentcyan font-medium flex items-center gap-2">
-        <i data-lucide="radar" class="w-4 h-4"></i> Live Scanner & Setups
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-6 text-sm overflow-x-auto">
+      <button onclick="switchTab('scanner')" id="tab-btn-scanner" class="py-2.5 border-b-2 border-accentcyan text-accentcyan font-medium flex items-center gap-2 whitespace-nowrap">
+        <i data-lucide="radar" class="w-4 h-4"></i> Scanner & Setups
       </button>
-      <button onclick="switchTab('chain')" id="tab-btn-chain" class="py-2.5 border-b-2 border-transparent text-gray-400 hover:text-gray-200 font-medium flex items-center gap-2">
-        <i data-lucide="layers" class="w-4 h-4"></i> Options Chain & Greeks 2.0
+      <button onclick="switchTab('unusual')" id="tab-btn-unusual" class="py-2.5 border-b-2 border-transparent text-gray-400 hover:text-gray-200 font-medium flex items-center gap-2 whitespace-nowrap">
+        <i data-lucide="magnet" class="w-4 h-4 text-purple-400"></i> Unusual Greeks & Magnets
+        <span class="bg-purple-900/50 text-purple-300 text-[10px] px-1.5 py-0.5 rounded-full font-mono">NEU</span>
       </button>
-      <button onclick="switchTab('paper')" id="tab-btn-paper" class="py-2.5 border-b-2 border-transparent text-gray-400 hover:text-gray-200 font-medium flex items-center gap-2">
+      <button onclick="switchTab('ai')" id="tab-btn-ai" class="py-2.5 border-b-2 border-transparent text-gray-400 hover:text-gray-200 font-medium flex items-center gap-2 whitespace-nowrap">
+        <i data-lucide="bot" class="w-4 h-4 text-accentgreen"></i> NVIDIA AI Quant Copilot
+        <span class="bg-accentgreen/20 text-accentgreen text-[10px] px-1.5 py-0.5 rounded-full font-mono">120B/340B</span>
+      </button>
+      <button onclick="switchTab('chain')" id="tab-btn-chain" class="py-2.5 border-b-2 border-transparent text-gray-400 hover:text-gray-200 font-medium flex items-center gap-2 whitespace-nowrap">
+        <i data-lucide="layers" class="w-4 h-4"></i> Options Chain 2.0
+      </button>
+      <button onclick="switchTab('paper')" id="tab-btn-paper" class="py-2.5 border-b-2 border-transparent text-gray-400 hover:text-gray-200 font-medium flex items-center gap-2 whitespace-nowrap">
         <i data-lucide="wallet" class="w-4 h-4"></i> Paper Portfolio
         <span id="paper-badge" class="bg-accentcyan/20 text-accentcyan text-[10px] px-1.5 py-0.5 rounded-full font-mono">0</span>
       </button>
-      <button onclick="switchTab('backtest')" id="tab-btn-backtest" class="py-2.5 border-b-2 border-transparent text-gray-400 hover:text-gray-200 font-medium flex items-center gap-2">
+      <button onclick="switchTab('backtest')" id="tab-btn-backtest" class="py-2.5 border-b-2 border-transparent text-gray-400 hover:text-gray-200 font-medium flex items-center gap-2 whitespace-nowrap">
         <i data-lucide="trending-up" class="w-4 h-4"></i> Backtest & Monte Carlo (+70.4% p.a.)
       </button>
     </div>
@@ -197,7 +214,135 @@
     </section>
 
     <!-- ============================================================== -->
-    <!-- TAB 2: OPTIONS CHAIN & GREEKS 2.0                              -->
+    <!-- TAB 2: UNUSUAL GREEKS VOLUME & MAGNETS                         -->
+    <!-- ============================================================== -->
+    <section id="tab-unusual" class="space-y-6 hidden">
+      <!-- Top Overview of Structural Magnets -->
+      <div>
+        <div class="flex justify-between items-center mb-3">
+          <div>
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i data-lucide="magnet" class="w-4 h-4 text-purple-400"></i>
+              Dominante Gamma-Magnete & Institutionelle Hedging-Walls
+            </h3>
+            <p class="text-xs text-gray-400">Strikes mit massiver Gamma/Vanna-Konzentration fungieren als gravitative Preismagnete (Pinning) oder dynamische Support/Resistance Zonen</p>
+          </div>
+          <button onclick="loadUnusualGreeks()" class="bg-purple-950/40 hover:bg-purple-900/50 text-purple-300 border border-purple-700/50 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Aktualisieren
+          </button>
+        </div>
+
+        <div id="magnets-cards-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="col-span-full py-8 text-center text-gray-500">Lade Gamma-Magnete...</div>
+        </div>
+      </div>
+
+      <!-- Live Anomalies Table -->
+      <div class="bg-cardbg rounded-xl border border-cardborder overflow-hidden shadow-lg">
+        <div class="px-4 py-3 border-b border-cardborder flex justify-between items-center bg-darkbg/50">
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i data-lucide="zap" class="w-4 h-4 text-yellow-400"></i>
+            Erkanntes Ungewöhnliches Volumen in den Griechen (Gamma, Vanna, Vega & Sweeps)
+          </h3>
+          <span id="anomaly-count-badge" class="text-xs font-mono bg-cardborder px-2 py-0.5 rounded text-gray-300">0 Anomalien</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs font-mono">
+            <thead class="bg-darkbg text-gray-400 uppercase text-[11px] border-b border-cardborder sticky top-0">
+              <tr>
+                <th class="px-4 py-2.5">Score</th>
+                <th class="px-4 py-2.5">Ticker</th>
+                <th class="px-4 py-2.5">Strike / Typ</th>
+                <th class="px-4 py-2.5">Exp (DTE)</th>
+                <th class="px-4 py-2.5">Typ der Anomalie</th>
+                <th class="px-4 py-2.5">Gamma Vol ($M)</th>
+                <th class="px-4 py-2.5">Vanna Vol ($M)</th>
+                <th class="px-4 py-2.5">Vega Vol ($k)</th>
+                <th class="px-4 py-2.5">Vol / OI</th>
+                <th class="px-4 py-2.5">Signal & Bedeutung</th>
+              </tr>
+            </thead>
+            <tbody id="anomalies-table-body" class="divide-y divide-cardborder/40 text-gray-200">
+              <tr><td colspan="10" class="text-center py-8 text-gray-500">Lade Anomalien-Daten...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- TAB 3: NVIDIA AI QUANT COPILOT                                 -->
+    <!-- ============================================================== -->
+    <section id="tab-ai" class="space-y-4 hidden">
+      <div class="bg-cardbg rounded-xl border border-cardborder p-4 shadow-lg flex flex-wrap gap-4 items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="bg-gradient-to-tr from-accentpurple to-accentcyan p-2.5 rounded-xl text-black">
+            <i data-lucide="bot" class="w-6 h-6 text-black"></i>
+          </div>
+          <div>
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+              NVIDIA NIM AI Quant Copilot
+              <span id="ai-model-badge" class="text-[11px] font-mono bg-purple-950 text-purple-300 border border-purple-700/60 px-2 py-0.5 rounded">NVIDIA Nemotron 70B/340B</span>
+            </h2>
+            <p class="text-xs text-gray-400">Direkter Zugriff auf Yahoo Finance Live-Kurse, EMA 20/50/200, RSI, Gamma-Magnete & Quant-Setups</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button onclick="openAiSettingsModal()" class="bg-darkbg hover:bg-cardborder text-gray-300 border border-cardborder px-3 py-1.5 rounded-lg text-xs font-mono flex items-center gap-1.5 transition">
+            <i data-lucide="key" class="w-3.5 h-3.5 text-yellow-400"></i>
+            <span id="ai-key-btn-text">API Key Konfigurieren</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Prompt Suggestions -->
+      <div class="flex flex-wrap gap-2 text-xs">
+        <span class="text-gray-400 text-[11px] self-center">Schnell-Fragen:</span>
+        <button onclick="sendQuickPrompt('Analysiere bitte SPY: Wo liegt der Gamma-Magnet und welche Strikes eignen sich für einen Credit Spread?')" 
+                class="bg-darkbg hover:bg-cardborder/70 border border-cardborder px-2.5 py-1 rounded-full text-accentcyan transition">
+          📍 SPY Gamma-Magnet & Credit Spread
+        </button>
+        <button onclick="sendQuickPrompt('Analysiere NVDA: Wie ist der Trend nach EMA 20/50/200 und wo liegen die Support/Resistance Walls?')" 
+                class="bg-darkbg hover:bg-cardborder/70 border border-cardborder px-2.5 py-1 rounded-full text-accentgreen transition">
+          🚀 NVDA Trend & Hedging Walls
+        </button>
+        <button onclick="sendQuickPrompt('Was bedeutet das ungewöhnliche Vanna- und Gamma-Volumen am Markt heute?')" 
+                class="bg-darkbg hover:bg-cardborder/70 border border-cardborder px-2.5 py-1 rounded-full text-accentpurple transition">
+          ⚡ Vanna & Gamma Flow Erklärung
+        </button>
+      </div>
+
+      <!-- Chat History Window -->
+      <div id="ai-chat-window" class="bg-darkbg/80 border border-cardborder rounded-xl p-4 h-[480px] overflow-y-auto space-y-4 shadow-inner">
+        <!-- Initial Welcome Message -->
+        <div class="flex items-start gap-3 bg-cardbg/70 p-3.5 rounded-xl border border-cardborder/60 max-w-3xl">
+          <div class="bg-accentpurple/20 p-1.5 rounded-lg text-accentpurple mt-0.5">
+            <i data-lucide="bot" class="w-4 h-4"></i>
+          </div>
+          <div class="text-xs space-y-1 text-gray-200">
+            <p class="font-bold text-accentcyan">Willkommen beim institutionalen NVIDIA AI Quant Copilot!</p>
+            <p class="text-gray-300">Ich bin direkt an Yahoo Finance und das quantitative Greeks-Engine angebunden. Ich analysiere in Echtzeit Spot-Preise, Indikatoren (EMA 20/50/200, RSI 14), Gamma-Magnete, Net GEX und ungewöhnliches Optionsvolumen.</p>
+            <p class="text-[11px] text-gray-400 italic">Frage mich nach Analysen zu Tickers wie SPY, QQQ, NVDA, AAPL, TSLA oder Erklärungen zu Griechen-Anomalien.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chat Input Bar -->
+      <div class="flex gap-2">
+        <input type="text" id="ai-user-input" placeholder="Frage die NVIDIA Quant-KI (z.B. 'Wie sieht das Gamma-Pinning für NVDA aus?')..."
+               onkeydown="if(event.key === 'Enter') sendAiMessage()"
+               class="flex-1 bg-cardbg border border-cardborder rounded-xl px-4 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-accentpurple font-mono">
+        <button id="ai-send-btn" onclick="sendAiMessage()" 
+                class="bg-gradient-to-r from-accentpurple to-accentcyan hover:opacity-90 text-black font-bold px-5 py-2.5 rounded-xl text-xs flex items-center gap-1.5 transition shadow">
+          <i data-lucide="send" class="w-4 h-4"></i>
+          <span>Fragen</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- TAB 4: OPTIONS CHAIN & GREEKS 2.0                              -->
     <!-- ============================================================== -->
     <section id="tab-chain" class="space-y-4 hidden">
       <div class="bg-cardbg rounded-xl border border-cardborder p-4 shadow-lg flex flex-wrap gap-4 items-center justify-between">
@@ -261,10 +406,9 @@
     </section>
 
     <!-- ============================================================== -->
-    <!-- TAB 3: VIRTUAL PAPER PORTFOLIO                                 -->
+    <!-- TAB 5: VIRTUAL PAPER PORTFOLIO                                 -->
     <!-- ============================================================== -->
     <section id="tab-paper" class="space-y-6 hidden">
-      <!-- Paper Portfolio Metrics -->
       <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div class="bg-cardbg border border-cardborder p-4 rounded-xl">
           <div class="text-xs text-gray-400">Gesamtkapital (Balance)</div>
@@ -293,7 +437,6 @@
         </div>
       </div>
 
-      <!-- Active Paper Positions -->
       <div class="bg-cardbg rounded-xl border border-cardborder overflow-hidden shadow-lg">
         <div class="px-4 py-3 border-b border-cardborder flex justify-between items-center bg-darkbg/50">
           <h3 class="text-sm font-bold text-white flex items-center gap-2">
@@ -326,7 +469,6 @@
         </div>
       </div>
 
-      <!-- Closed Paper Trades -->
       <div class="bg-cardbg rounded-xl border border-cardborder overflow-hidden shadow-lg">
         <div class="px-4 py-3 border-b border-cardborder flex justify-between items-center bg-darkbg/50">
           <h3 class="text-sm font-bold text-white flex items-center gap-2">
@@ -358,9 +500,10 @@
     </section>
 
     <!-- ============================================================== -->
-    <!-- TAB 4: BACKTEST & MONTE CARLO                                  -->
+    <!-- TAB 6: BACKTEST, MONTE CARLO & MAGNET BACKTEST                 -->
     <!-- ============================================================== -->
     <section id="tab-backtest" class="space-y-6 hidden">
+      <!-- Master Model Performance Cards -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div class="bg-cardbg border border-cardborder p-4 rounded-xl">
           <div class="text-xs text-gray-400">Jahresrendite (CAGR)</div>
@@ -381,6 +524,41 @@
           <div class="text-xs text-gray-400">Sharpe Ratio / Profit Factor</div>
           <div class="text-2xl font-bold font-mono text-accentyellow mt-1">1,25 / 1,40</div>
           <div class="text-[11px] text-gray-500 mt-1">Ø Haltedauer: 8,3 Tage</div>
+        </div>
+      </div>
+
+      <!-- NEW: GAMMA MAGNET PINNING BACKTEST SECTION -->
+      <div class="bg-cardbg border border-purple-900/50 rounded-xl p-5 shadow-lg space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-cardborder pb-3">
+          <div>
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i data-lucide="magnet" class="w-4 h-4 text-purple-400"></i>
+              Zusatz-Backtest: Gamma Magnet Pinning & Mean-Reversion Strategie
+            </h3>
+            <p class="text-xs text-gray-400 mt-0.5">Empirische Analyse der Kursanziehung an Gamma-Magnete und Rendite bei Einstieg nach Abweichung</p>
+          </div>
+          <button onclick="loadMagnetBacktest()" class="bg-purple-950/40 hover:bg-purple-900/50 text-purple-300 border border-purple-700/50 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition">
+            <i data-lucide="play" class="w-3 h-3"></i> Magnet-Test Aktualisieren
+          </button>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs font-mono">
+          <div class="bg-darkbg/70 p-3 rounded-lg border border-cardborder">
+            <span class="text-gray-400 block text-[10px]">PINNING-QUOTE (&plusmn;1% VOM MAGNET)</span>
+            <span id="magnet-pin-1pct" class="text-purple-400 font-bold text-base">--%</span>
+          </div>
+          <div class="bg-darkbg/70 p-3 rounded-lg border border-cardborder">
+            <span class="text-gray-400 block text-[10px]">PINNING-QUOTE (&plusmn;2% VOM MAGNET)</span>
+            <span id="magnet-pin-2pct" class="text-accentcyan font-bold text-base">--%</span>
+          </div>
+          <div class="bg-darkbg/70 p-3 rounded-lg border border-cardborder">
+            <span class="text-gray-400 block text-[10px]">STRATEGIE CAGR</span>
+            <span id="magnet-cagr" class="text-accentgreen font-bold text-base">+--% p.a.</span>
+          </div>
+          <div class="bg-darkbg/70 p-3 rounded-lg border border-cardborder">
+            <span class="text-gray-400 block text-[10px]">WIN RATE BEI MEAN-REVERSION</span>
+            <span id="magnet-winrate" class="text-yellow-400 font-bold text-base">--%</span>
+          </div>
         </div>
       </div>
 
@@ -423,19 +601,7 @@
         </div>
       </div>
 
-      <div class="bg-cardbg border border-cardborder p-5 rounded-xl">
-        <h3 class="text-sm font-bold text-white mb-2 flex items-center gap-2">
-          <i data-lucide="shield-check" class="w-4 h-4 text-accentgreen"></i>
-          Warum das Master-Modell 70+% CAGR bei kontrolliertem Risiko erreicht:
-        </h3>
-        <ul class="text-xs text-gray-300 space-y-1.5 list-disc list-inside">
-          <li><strong>Schneller Kapitalumschlag (8,3 Tage):</strong> Durch Schließen der Spreads bei 45–50 % Gewinn wird Kapital ~26-mal pro Jahr neu investiert.</li>
-          <li><strong>Keine nackten Optionen (Strikte Defined-Risk Wings):</strong> Der Maximalverlust ist von vornherein pro Kontrakt gedeckelt.</li>
-          <li><strong>Regime-Switching:</strong> Bull Put Spreads im Aufwärtstrend, Bear Call Spreads im Abwärtstrend, und Debit Spreads bei billigen Vol-Breakouts.</li>
-          <li><strong>Multi-Asset Diversifikation:</strong> 8 unkorrelierte Werte (SPY, QQQ, AAPL, NVDA, TSLA, AMD, META, MSFT) glätten die Drawdowns.</li>
-        </ul>
-      </div>
-
+      <!-- Realized Trades Log Table -->
       <div class="bg-cardbg rounded-xl border border-cardborder overflow-hidden shadow-lg">
         <div class="px-4 py-3 border-b border-cardborder flex justify-between items-center bg-darkbg/50">
           <h3 class="text-sm font-bold text-white flex items-center gap-2">
@@ -470,7 +636,47 @@
   </main>
 
   <!-- ============================================================== -->
-  <!-- MODAL 1: INTERACTIVE PAYOFF DIAGRAM                            -->
+  <!-- MODAL: NVIDIA AI SETTINGS & API KEY                            -->
+  <!-- ============================================================== -->
+  <div id="ai-settings-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-cardbg border border-cardborder rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-cardborder pb-3">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i data-lucide="settings" class="w-4 h-4 text-accentpurple"></i>
+          NVIDIA NIM AI Konfiguration
+        </h3>
+        <button onclick="closeAiSettingsModal()" class="text-gray-400 hover:text-white p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-gray-400 mb-1">NVIDIA API Key</label>
+          <input type="password" id="modal-api-key" placeholder="nvapi-..." 
+                 class="w-full bg-darkbg border border-cardborder rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-accentpurple">
+          <p class="text-[11px] text-gray-500 mt-1">Erhalte einen kostenlosen Key unter <a href="https://build.nvidia.com" target="_blank" class="text-accentcyan underline">build.nvidia.com</a>.</p>
+        </div>
+
+        <div>
+          <label class="block text-gray-400 mb-1">NVIDIA Supermodel</label>
+          <select id="modal-model-select" class="w-full bg-darkbg border border-cardborder rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-accentpurple">
+            <option value="nvidia/llama-3.1-nemotron-70b-instruct" selected>NVIDIA Llama 3.1 Nemotron 70B (Empfohlen)</option>
+            <option value="nvidia/nemotron-4-340b-instruct">NVIDIA Nemotron-4 340B Supermodel</option>
+            <option value="meta/llama-3.1-405b-instruct">Meta Llama 3.1 405B Ultra Model</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="pt-3 border-t border-cardborder flex justify-end gap-2">
+        <button onclick="closeAiSettingsModal()" class="bg-cardborder text-white px-4 py-2 rounded-lg text-xs font-medium">Abbrechen</button>
+        <button onclick="saveAiSettings()" class="bg-gradient-to-r from-accentpurple to-accentcyan hover:opacity-90 text-black font-bold px-4 py-2 rounded-lg text-xs">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- MODAL: INTERACTIVE PAYOFF DIAGRAM                              -->
   <!-- ============================================================== -->
   <div id="payoff-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
     <div class="bg-cardbg border border-cardborder rounded-2xl w-full max-w-4xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
@@ -482,12 +688,11 @@
           </h3>
           <p id="payoff-subtitle" class="text-xs text-gray-400 font-mono mt-0.5">--</p>
         </div>
-        <button onclick="closePayoffModal()" class="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition">
+        <button onclick="closePayoffModal()" class="text-gray-400 hover:text-white p-1 rounded-lg">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
 
-      <!-- Key Payoff Metrics Row -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs font-mono">
         <div class="bg-darkbg/80 p-3 rounded-lg border border-cardborder">
           <span class="text-gray-400 block text-[10px]">MAXIMALER GEWINN</span>
@@ -507,14 +712,13 @@
         </div>
       </div>
 
-      <!-- Chart Container -->
       <div class="relative h-80 w-full bg-darkbg p-3 rounded-xl border border-cardborder">
         <canvas id="payoffChart"></canvas>
       </div>
 
       <div class="flex justify-between items-center text-xs text-gray-400 pt-2 border-t border-cardborder">
         <div class="flex items-center gap-4">
-          <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 bg-accentgreen inline-block"></span> Bei Verfall (T=0)</span>
+          <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 bg-accentgreen inline-block"></span> Verfall (T=0)</span>
           <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 bg-accentcyan inline-block"></span> Heute (T=DTE)</span>
           <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 bg-purple-400 inline-block"></span> Halbzeit (T=DTE/2)</span>
         </div>
@@ -526,7 +730,7 @@
   </div>
 
   <!-- ============================================================== -->
-  <!-- MODAL 2: POSITION SIZING & PAPER TRADE                         -->
+  <!-- MODAL: POSITION SIZING & PAPER TRADE                           -->
   <!-- ============================================================== -->
   <div id="sizing-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
     <div class="bg-cardbg border border-cardborder rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4">
@@ -538,7 +742,7 @@
           </h3>
           <p id="sizing-subtitle" class="text-xs text-gray-400 font-mono mt-0.5">--</p>
         </div>
-        <button onclick="closeSizingModal()" class="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition">
+        <button onclick="closeSizingModal()" class="text-gray-400 hover:text-white p-1 rounded-lg">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
@@ -596,10 +800,11 @@
     let activeTradeForModal = null;
     let payoffChartInstance = null;
     let mcChartInstance = null;
+    let aiChatHistory = [];
 
     function switchTab(tab) {
       activeTab = tab;
-      ['scanner', 'chain', 'paper', 'backtest'].forEach(t => {
+      ['scanner', 'unusual', 'ai', 'chain', 'paper', 'backtest'].forEach(t => {
         const sec = document.getElementById('tab-' + t);
         const btn = document.getElementById('tab-btn-' + t);
         if (t === tab) {
@@ -613,6 +818,12 @@
         }
       });
 
+      if (tab === 'unusual') {
+        loadUnusualGreeks();
+      }
+      if (tab === 'ai') {
+        checkAiConfig();
+      }
       if (tab === 'chain' && document.getElementById('chain-table-body').children.length <= 1) {
         loadChain();
       }
@@ -626,6 +837,7 @@
         if (!mcChartInstance) {
           loadMonteCarlo();
         }
+        loadMagnetBacktest();
       }
     }
 
@@ -681,7 +893,6 @@
             ? '<span class="px-2 py-0.5 rounded bg-green-500/15 text-accentgreen border border-green-500/30 font-bold">SELL (Credit)</span>'
             : '<span class="px-2 py-0.5 rounded bg-cyan-500/15 text-accentcyan border border-cyan-500/30 font-bold">BUY (Hebel)</span>';
 
-          // Confidence color
           let confColor = 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40';
           if (t.confidence_score >= 85) confColor = 'bg-emerald-500/20 text-accentgreen border-emerald-500/40';
           else if (t.confidence_score < 70) confColor = 'bg-gray-500/20 text-gray-400 border-gray-500/40';
@@ -710,8 +921,8 @@
                   <button onclick="openSizingModal('${t.symbol}')" class="bg-accentgreen/15 hover:bg-accentgreen/30 text-accentgreen border border-accentgreen/40 px-2 py-1 rounded text-xs font-bold transition" title="Order Sizing / Paper Trade">
                     Trade
                   </button>
-                  <button onclick="inspectChain('${t.symbol}')" class="text-gray-400 hover:text-white px-1.5 py-1 text-xs" title="Options Chain">
-                    &rarr;
+                  <button onclick="askAiAboutTicker('${t.symbol}')" class="bg-purple-950/40 hover:bg-purple-900/50 text-purple-300 border border-purple-700/50 px-2 py-1 rounded text-xs font-bold transition" title="NVIDIA KI Analyse">
+                    KI
                   </button>
                 </div>
               </td>
@@ -719,7 +930,6 @@
           `;
 
           const borderStyle = isSell ? 'border-accentgreen/40' : 'border-accentcyan/40';
-
           const strengthsHtml = (t.strengths || []).slice(0, 2).map(s => `<li class="text-emerald-300 flex items-center gap-1"><i data-lucide="check" class="w-3 h-3"></i> ${s}</li>`).join('');
           const risksHtml = (t.risks || []).slice(0, 1).map(r => `<li class="text-yellow-300 flex items-center gap-1"><i data-lucide="alert-circle" class="w-3 h-3"></i> ${r}</li>`).join('');
 
@@ -770,7 +980,6 @@
                   <div class="text-gray-300">Return on Capital: <span class="text-accentcyan font-bold">${t.roc_pct}%</span></div>
                 </div>
 
-                <!-- Strengths & Risks -->
                 <ul class="text-[11px] mb-3 space-y-0.5 bg-darkbg/50 p-2 rounded border border-cardborder/50">
                   ${strengthsHtml}
                   ${risksHtml}
@@ -786,11 +995,15 @@
               <div class="mt-4 pt-3 border-t border-cardborder flex items-center justify-between gap-2">
                 <button onclick="openPayoffModal('${t.symbol}')" class="flex-1 bg-accentcyan/15 hover:bg-accentcyan/25 text-accentcyan border border-accentcyan/30 py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5">
                   <i data-lucide="line-chart" class="w-3.5 h-3.5"></i>
-                  <span>Payoff Diagramm</span>
+                  <span>Payoff</span>
                 </button>
                 <button onclick="openSizingModal('${t.symbol}')" class="flex-1 bg-gradient-to-r from-accentgreen to-emerald-600 hover:opacity-90 text-black py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 shadow">
                   <i data-lucide="calculator" class="w-3.5 h-3.5"></i>
-                  <span>Kelly Sizing & Paper</span>
+                  <span>Kelly Sizing</span>
+                </button>
+                <button onclick="askAiAboutTicker('${t.symbol}')" class="bg-purple-950/40 hover:bg-purple-900/50 text-purple-300 border border-purple-700/50 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1">
+                  <i data-lucide="bot" class="w-3.5 h-3.5"></i>
+                  <span>KI</span>
                 </button>
               </div>
             </div>
@@ -806,6 +1019,253 @@
       }
     }
 
+    // -------------------------------------------------------------
+    // UNUSUAL GREEKS & MAGNETS TAB LOGIC
+    // -------------------------------------------------------------
+    async function loadUnusualGreeks() {
+      const cardsGrid = document.getElementById('magnets-cards-grid');
+      const tableBody = document.getElementById('anomalies-table-body');
+
+      cardsGrid.innerHTML = '<div class="col-span-full py-8 text-center text-accentpurple animate-pulse">Analysiere Gamma-Magnete & berechne ungewöhnliche Greeks-Flows...</div>';
+      tableBody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-accentpurple animate-pulse">Lade Anomalien-Daten...</td></tr>';
+
+      try {
+        const res = await fetch('/api/greeks/unusual?symbols=SPY,QQQ,AAPL,NVDA,TSLA,AMD,META,MSFT');
+        const data = await res.json();
+
+        // Populate Cards
+        let cardsHtml = '';
+        data.structures.forEach(s => {
+          const isStrong = s.magnet_pull_force === 'STRONG_PINNING';
+          const pullBadge = isStrong 
+            ? '<span class="bg-accentgreen/20 text-accentgreen border border-accentgreen/30 px-1.5 py-0.5 rounded text-[10px] font-bold">STARKES PINNING (&lt;1%)</span>'
+            : '<span class="bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 px-1.5 py-0.5 rounded text-[10px] font-bold">MODERAT</span>';
+
+          cardsHtml += `
+            <div class="bg-cardbg border border-cardborder hover:border-purple-600/50 p-4 rounded-xl shadow transition">
+              <div class="flex justify-between items-start mb-2">
+                <div>
+                  <span class="text-base font-bold text-yellow-400 font-mono">${s.symbol}</span>
+                  <span class="text-xs text-gray-400 font-mono ml-2">$${s.spot_price}</span>
+                </div>
+                ${pullBadge}
+              </div>
+
+              <div class="bg-darkbg/70 p-2.5 rounded-lg border border-cardborder mb-2.5 font-mono">
+                <span class="text-[10px] text-gray-400 block">PRIMARY GAMMA MAGNET</span>
+                <span class="text-lg font-bold text-accentpurple">$${s.primary_magnet_strike}</span>
+                <span class="text-[11px] text-gray-400 ml-1">(${s.magnet_distance_pct >= 0 ? '+' : ''}${s.magnet_distance_pct}%)</span>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 text-xs font-mono">
+                <div class="bg-darkbg/40 p-2 rounded">
+                  <span class="text-[10px] text-gray-500 block">SUPPORT (PUT)</span>
+                  <span class="text-accentgreen font-bold">$${s.put_support_strike}</span>
+                </div>
+                <div class="bg-darkbg/40 p-2 rounded">
+                  <span class="text-[10px] text-gray-500 block">RESISTANCE (CALL)</span>
+                  <span class="text-accentred font-bold">$${s.call_resistance_strike}</span>
+                </div>
+              </div>
+
+              <div class="mt-2.5 pt-2 border-t border-cardborder/50 flex justify-between text-[11px] font-mono text-gray-400">
+                <span>Gamma Vol: <strong class="text-white">$${s.total_gamma_volume_m}M</strong></span>
+                <span>Anomalien: <strong class="text-purple-300">${s.anomaly_count}</strong></span>
+              </div>
+            </div>
+          `;
+        });
+        cardsGrid.innerHTML = cardsHtml;
+
+        // Populate Anomalies Table
+        document.getElementById('anomaly-count-badge').innerText = `${data.anomalies.length} Anomalien`;
+        if (!data.anomalies || data.anomalies.length === 0) {
+          tableBody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-gray-500">Keine extremen Anomalien im aktuellen Zeitfenster.</td></tr>';
+          return;
+        }
+
+        let rowsHtml = '';
+        data.anomalies.forEach(a => {
+          let badgeClass = 'bg-purple-950/60 text-purple-300 border-purple-800';
+          if (a.anomaly_type === 'UNUSUAL_GAMMA') badgeClass = 'bg-accentgreen/20 text-accentgreen border-accentgreen/40';
+          if (a.anomaly_type === 'UNUSUAL_VANNA') badgeClass = 'bg-accentcyan/20 text-accentcyan border-accentcyan/40';
+          if (a.anomaly_type === 'UNUSUAL_SWEEP') badgeClass = 'bg-accentyellow/20 text-accentyellow border-accentyellow/40';
+
+          rowsHtml += `
+            <tr class="hover:bg-darkbg/60 transition">
+              <td class="px-4 py-2.5 font-bold text-accentgreen">${a.significance_score}%</td>
+              <td class="px-4 py-2.5 font-bold text-yellow-400">${a.symbol}</td>
+              <td class="px-4 py-2.5 font-bold text-white">$${a.strike} <span class="${a.option_type === 'CALL' ? 'text-accentcyan' : 'text-accentyellow'}">${a.option_type}</span></td>
+              <td class="px-4 py-2.5 text-gray-400">${a.expiration} (${a.dte}d)</td>
+              <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded border text-[10px] font-bold ${badgeClass}">${a.anomaly_type}</span></td>
+              <td class="px-4 py-2.5 text-accentgreen font-bold">$${a.gamma_vol_m}M</td>
+              <td class="px-4 py-2.5 text-accentcyan font-bold">$${a.vanna_vol_m}M</td>
+              <td class="px-4 py-2.5 text-purple-400">$${a.vega_vol_k}k</td>
+              <td class="px-4 py-2.5 font-bold text-white">${a.vol_oi_ratio}x</td>
+              <td class="px-4 py-2.5 text-xs text-gray-300">${a.description}</td>
+            </tr>
+          `;
+        });
+        tableBody.innerHTML = rowsHtml;
+        lucide.createIcons();
+
+      } catch (e) {
+        cardsGrid.innerHTML = `<div class="col-span-full py-8 text-center text-red-400">Fehler beim Laden: ${e.message}</div>`;
+      }
+    }
+
+    // -------------------------------------------------------------
+    // NVIDIA AI QUANT COPILOT LOGIC
+    // -------------------------------------------------------------
+    async function checkAiConfig() {
+      try {
+        const res = await fetch('/api/ai/config');
+        const data = await res.json();
+        document.getElementById('ai-model-badge').innerText = data.model;
+        if (data.has_api_key) {
+          document.getElementById('ai-key-btn-text').innerText = `Key: ${data.api_key_status}`;
+          document.getElementById('header-ai-status').innerText = 'NVIDIA 120B Bereit';
+        } else {
+          document.getElementById('ai-key-btn-text').innerText = 'API Key eingeben';
+          document.getElementById('header-ai-status').innerText = 'NVIDIA KI Setup';
+        }
+      } catch (e) {
+        console.error("AI config error", e);
+      }
+    }
+
+    function openAiSettingsModal() {
+      document.getElementById('ai-settings-modal').classList.remove('hidden');
+    }
+
+    function closeAiSettingsModal() {
+      document.getElementById('ai-settings-modal').classList.add('hidden');
+    }
+
+    async function saveAiSettings() {
+      const key = document.getElementById('modal-api-key').value;
+      const model = document.getElementById('modal-model-select').value;
+      try {
+        await fetch('/api/ai/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ api_key: key, model: model })
+        });
+        closeAiSettingsModal();
+        checkAiConfig();
+        alert('NVIDIA KI-Einstellungen erfolgreich gespeichert!');
+      } catch (e) {
+        alert('Fehler beim Speichern: ' + e.message);
+      }
+    }
+
+    function askAiAboutTicker(sym) {
+      switchTab('ai');
+      document.getElementById('ai-user-input').value = `Analysiere bitte ${sym}: Wie ist das Gamma-Regime, wo liegt der Gamma-Magnet und welche Options-Strategie hat die höchste Erfolgswahrscheinlichkeit?`;
+      sendAiMessage();
+    }
+
+    function sendQuickPrompt(promptText) {
+      document.getElementById('ai-user-input').value = promptText;
+      sendAiMessage();
+    }
+
+    async function sendAiMessage() {
+      const input = document.getElementById('ai-user-input');
+      const prompt = input.value.trim();
+      if (!prompt) return;
+
+      const chatWindow = document.getElementById('ai-chat-window');
+      const btn = document.getElementById('ai-send-btn');
+
+      // Append User message
+      chatWindow.innerHTML += `
+        <div class="flex items-start gap-3 justify-end">
+          <div class="bg-gradient-to-r from-accentpurple/30 to-accentcyan/30 text-white p-3 rounded-xl border border-cardborder max-w-2xl text-xs">
+            ${prompt}
+          </div>
+          <div class="bg-cardborder p-1.5 rounded-lg text-white mt-0.5">
+            <i data-lucide="user" class="w-4 h-4"></i>
+          </div>
+        </div>
+      `;
+      input.value = '';
+      chatWindow.scrollTop = chatWindow.scrollHeight;
+
+      // Append Loading indicator
+      const loadingId = 'ai-loading-' + Date.now();
+      chatWindow.innerHTML += `
+        <div id="${loadingId}" class="flex items-start gap-3 bg-cardbg/70 p-3.5 rounded-xl border border-cardborder/60 max-w-3xl">
+          <div class="bg-accentpurple/20 p-1.5 rounded-lg text-accentpurple animate-pulse">
+            <i data-lucide="bot" class="w-4 h-4"></i>
+          </div>
+          <div class="text-xs text-accentpurple animate-pulse font-mono">
+            Rufe Yahoo Finance Live-Daten ab & befrage das NVIDIA Supermodel...
+          </div>
+        </div>
+      `;
+      chatWindow.scrollTop = chatWindow.scrollHeight;
+      lucide.createIcons();
+
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/ai/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: prompt, history: aiChatHistory })
+        });
+        const data = await res.json();
+        const loadingEl = document.getElementById(loadingId);
+        if (loadingEl) loadingEl.remove();
+
+        const renderedMarkdown = marked.parse(data.reply);
+
+        chatWindow.innerHTML += `
+          <div class="flex items-start gap-3 bg-cardbg/90 p-4 rounded-xl border border-cardborder max-w-3xl shadow">
+            <div class="bg-gradient-to-tr from-accentpurple to-accentcyan p-1.5 rounded-lg text-black mt-0.5">
+              <i data-lucide="bot" class="w-4 h-4"></i>
+            </div>
+            <div class="text-xs text-gray-200 prose-dark space-y-1 w-full overflow-hidden">
+              ${renderedMarkdown}
+              ${data.notice ? `<div class="mt-2 p-2 rounded bg-purple-950/40 border border-purple-800/40 text-[11px] text-purple-300 font-mono">${data.notice}</div>` : ''}
+            </div>
+          </div>
+        `;
+
+        aiChatHistory.push({ role: "user", content: prompt });
+        aiChatHistory.push({ role: "assistant", content: data.reply });
+
+      } catch (e) {
+        const loadingEl = document.getElementById(loadingId);
+        if (loadingEl) loadingEl.remove();
+        chatWindow.innerHTML += `<div class="p-3 bg-red-950/50 border border-red-800 rounded-xl text-xs text-red-300">Fehler: ${e.message}</div>`;
+      } finally {
+        btn.disabled = false;
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+        lucide.createIcons();
+      }
+    }
+
+    // -------------------------------------------------------------
+    // MAGNET BACKTEST LOGIC
+    // -------------------------------------------------------------
+    async function loadMagnetBacktest() {
+      try {
+        const res = await fetch('/api/backtest/magnet');
+        const data = await res.json();
+        document.getElementById('magnet-pin-1pct').innerText = data.pinning_stats.pin_accuracy_1pct_rate + '%';
+        document.getElementById('magnet-pin-2pct').innerText = data.pinning_stats.pin_accuracy_2pct_rate + '%';
+        document.getElementById('magnet-cagr').innerText = '+' + data.cagr_pct + '% p.a.';
+        document.getElementById('magnet-winrate').innerText = data.win_rate_pct + '%';
+      } catch (e) {
+        console.error("Magnet backtest error", e);
+      }
+    }
+
+    // -------------------------------------------------------------
+    // OPTIONS CHAIN LOGIC
+    // -------------------------------------------------------------
     async function loadChain() {
       const sym = document.getElementById('chain-symbol').value || 'SPY';
       const expSelect = document.getElementById('chain-expiration');
@@ -868,12 +1328,6 @@
       } catch (e) {
         tbody.innerHTML = `<tr><td colspan="14" class="text-center py-8 text-red-400">Fehler: ${e.message}</td></tr>`;
       }
-    }
-
-    function inspectChain(sym) {
-      document.getElementById('chain-symbol').value = sym;
-      switchTab('chain');
-      loadChain();
     }
 
     // -------------------------------------------------------------
@@ -1059,7 +1513,6 @@
             expiration: activeTradeForModal.expiration
           })
         });
-        const resData = await res.json();
         closeSizingModal();
         loadPaperPortfolio();
         alert(`Paper Trade für ${activeTradeForModal.symbol} (${contracts} Kontrakte) erfolgreich eröffnet!`);
@@ -1089,10 +1542,10 @@
         document.getElementById('paper-open-count').innerText = openCount;
         document.getElementById('paper-badge').innerText = openCount;
 
-        // Populate Open Positions
+        // Open Positions
         const tbodyOpen = document.getElementById('paper-positions-body');
         if (!data.open_positions || data.open_positions.length === 0) {
-          tbodyOpen.innerHTML = '<tr><td colspan="9" class="text-center py-6 text-gray-500">Keine offenen Positionen. Wähle Setups im Scanner aus!</td></tr>';
+          tbodyOpen.innerHTML = '<tr><td colspan="9" class="text-center py-6 text-gray-500">Keine offenen Positionen. Öffne Trades aus dem Scanner!</td></tr>';
         } else {
           let html = '';
           data.open_positions.forEach(p => {
@@ -1118,7 +1571,7 @@
           tbodyOpen.innerHTML = html;
         }
 
-        // Populate Closed Positions
+        // Closed Positions
         const tbodyClosed = document.getElementById('paper-closed-body');
         document.getElementById('paper-closed-count').innerText = `${(data.closed_trades || []).length} geschlossene Trades`;
         if (!data.closed_trades || data.closed_trades.length === 0) {
@@ -1151,12 +1604,11 @@
 
     async function closePaperPosition(tradeId, exitPrice, reason) {
       try {
-        const res = await fetch('/api/paper/close', {
+        await fetch('/api/paper/close', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ trade_id: tradeId, exit_price: exitPrice, reason: reason })
         });
-        await res.json();
         loadPaperPortfolio();
       } catch (e) {
         alert('Fehler beim Schließen: ' + e.message);
@@ -1285,6 +1737,8 @@
       updateMacro();
       if (activeTab === 'scanner') {
         fetchSignals();
+      } else if (activeTab === 'unusual') {
+        loadUnusualGreeks();
       } else if (activeTab === 'chain') {
         loadChain();
       } else if (activeTab === 'paper') {
@@ -1304,6 +1758,7 @@
       lucide.createIcons();
       updateMacro();
       fetchSignals();
+      checkAiConfig();
       autoRefreshTimer = setInterval(triggerRefresh, 15000);
     });
   </script>
