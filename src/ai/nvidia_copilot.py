@@ -32,8 +32,8 @@ class NvidiaQuantCopilot:
     _model_override: Optional[str] = None
 
     @classmethod
-    def set_api_key(cls, key: str):
-        cls._api_key_override = key.strip() if key else None
+    def set_api_key(cls, key: Optional[str]):
+        cls._api_key_override = key.strip() if key is not None else None
 
     @classmethod
     def set_model(cls, model: str):
@@ -41,8 +41,8 @@ class NvidiaQuantCopilot:
 
     @classmethod
     def get_api_key(cls) -> Optional[str]:
-        if cls._api_key_override:
-            return cls._api_key_override
+        if cls._api_key_override is not None:
+            return cls._api_key_override if cls._api_key_override else None
         return os.getenv("NVIDIA_API_KEY")
 
     @classmethod
@@ -200,7 +200,7 @@ RICHTLINIEN FÜR DEINE ANTWORTEN:
                   "User-Agent": "OptionsTrading-NvidiaCopilot/2.0"
                 }
             )
-            with urllib.request.urlopen(req, timeout=30) as resp:
+            with urllib.request.urlopen(req, timeout=60) as resp:
                 resp_json = json.loads(resp.read().decode("utf-8"))
                 reply_text = resp_json["choices"][0]["message"]["content"]
                 return {
@@ -243,12 +243,17 @@ RICHTLINIEN FÜR DEINE ANTWORTEN:
         legs = data.get("legs", "---")
         iv_rank = data.get("iv_rank", "---")
 
+        try:
+            rsi_val = float(rsi)
+        except (ValueError, TypeError):
+            rsi_val = 50.0
+
         return f"""### 🤖 NVIDIA Quant-Analyse für **{sym}**
 
 **1. Live Markt- & Indikatoren-Profil (Yahoo Finance):**
 - **Aktueller Kurs:** `${spot}` ({data.get('day_change_pct', 0.0):+}% heute)
 - **Trend-Status:** `{trend}` (EMA 20: `${data.get('ema_20')}`, EMA 50: `${data.get('ema_50')}`, EMA 200: `${data.get('ema_200')}`)
-- **RSI (14):** `{rsi}` ({'Überverkauft' if float(rsi or 50) < 35 else 'Überkauft' if float(rsi or 50) > 70 else 'Neutral'})
+- **RSI (14):** `{rsi}` ({'Überverkauft' if rsi_val < 35 else 'Überkauft' if rsi_val > 70 else 'Neutral'})
 - **IV Rank:** `{iv_rank}%` (VIX: `{data.get('vix_level')}`)
 
 **2. Dealer Greeks & Ungewöhnliches Volumen:**

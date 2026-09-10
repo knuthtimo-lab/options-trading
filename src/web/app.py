@@ -562,7 +562,8 @@ def get_ai_config():
         "api_key_status": masked,
         "model": NvidiaQuantCopilot.get_model(),
         "available_models": [
-            {"id": "nvidia/nemotron-3-super-120b-a12b", "name": "NVIDIA Nemotron-3 Super 120B (Standard)"},
+            {"id": "nvidia/nemotron-3.5-lightning-30b-a3b", "name": "NVIDIA Nemotron-3.5 Lightning 30B (Ultra-Fast)"},
+            {"id": "nvidia/nemotron-3-super-120b-a12b", "name": "NVIDIA Nemotron-3 Super 120B (Supermodel)"},
             {"id": "nvidia/llama-3.1-nemotron-70b-instruct", "name": "NVIDIA Llama 3.1 Nemotron 70B"},
             {"id": "nvidia/nemotron-4-340b-instruct", "name": "NVIDIA Nemotron-4 340B Supermodel"},
         ]

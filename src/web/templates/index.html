@@ -661,9 +661,10 @@
         <div>
           <label class="block text-gray-400 mb-1">NVIDIA Supermodel</label>
           <select id="modal-model-select" class="w-full bg-darkbg border border-cardborder rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-accentpurple">
-            <option value="nvidia/llama-3.1-nemotron-70b-instruct" selected>NVIDIA Llama 3.1 Nemotron 70B (Empfohlen)</option>
+            <option value="nvidia/nemotron-3.5-lightning-30b-a3b">NVIDIA Nemotron-3.5 Lightning 30B (Ultra-Fast)</option>
+            <option value="nvidia/nemotron-3-super-120b-a12b" selected>NVIDIA Nemotron-3 Super 120B (Supermodel)</option>
+            <option value="nvidia/llama-3.1-nemotron-70b-instruct">NVIDIA Llama 3.1 Nemotron 70B</option>
             <option value="nvidia/nemotron-4-340b-instruct">NVIDIA Nemotron-4 340B Supermodel</option>
-            <option value="meta/llama-3.1-405b-instruct">Meta Llama 3.1 405B Ultra Model</option>
           </select>
         </div>
       </div>
@@ -1122,9 +1123,15 @@
         const res = await fetch('/api/ai/config');
         const data = await res.json();
         document.getElementById('ai-model-badge').innerText = data.model;
+        if (data.available_models && data.available_models.length > 0) {
+          const select = document.getElementById('modal-model-select');
+          select.innerHTML = data.available_models.map(m => 
+            `<option value="${m.id}" ${m.id === data.model ? 'selected' : ''}>${m.name}</option>`
+          ).join('');
+        }
         if (data.has_api_key) {
           document.getElementById('ai-key-btn-text').innerText = `Key: ${data.api_key_status}`;
-          document.getElementById('header-ai-status').innerText = 'NVIDIA 120B Bereit';
+          document.getElementById('header-ai-status').innerText = 'NVIDIA Bereit';
         } else {
           document.getElementById('ai-key-btn-text').innerText = 'API Key eingeben';
           document.getElementById('header-ai-status').innerText = 'NVIDIA KI Setup';
