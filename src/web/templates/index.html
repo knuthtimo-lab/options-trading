@@ -1596,7 +1596,8 @@
     let curatedSetupsData = null;
     let curatedCurrentCategory = 'ALL';
     let asymmetricData = null;
-    let asymmetricCurrentMode = 'LONGS';
+    let asymmetricUniverse = 'SP500';
+    let asymmetricCurrentMode = 'ALL_LONGS';
 
     function switchTab(tab) {
       activeTab = tab;
@@ -1875,9 +1876,6 @@
       container.innerHTML = html;
       if (window.lucide) lucide.createIcons();
     }
-
-    let asymmetricUniverse = 'SP500';
-    let asymmetricCurrentMode = 'ALL_LONGS';
 
     function setAsymmetricUniverse(univ) {
       asymmetricUniverse = univ;
