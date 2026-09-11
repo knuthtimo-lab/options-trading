@@ -1118,132 +1118,65 @@ def get_ai_config():
 # -------------------------------------------------------------
 # ASYMMETRIC LONG & LEAPS / PMCC ENDPOINTS
 # -------------------------------------------------------------
+@app.get("/api/asymmetric/sp500")
+def get_sp500_asymmetric_setups(
+    filter_type: str = Query("ALL", description="Filter: ALL, CALL, PUT, PMCC"),
+    limit: int = Query(20, description="Max setups to return"),
+    force_refresh: bool = Query(False, description="Force re-scan"),
+):
+    """
+    Scans the S&P 500 universe and returns only genuinely qualified asymmetric setups:
+    - 45 DTE Long Calls (IVR <= 25%, bullish momentum, 200-800% targets)
+    - 45 DTE Long Puts (IVR <= 30%, bearish breakdown, 300-800% targets)
+    - Deep ITM LEAPS PMCC (secular uptrend, >= 1.5% monthly yield, 2.5x leverage)
+    """
+    filter_str = filter_type if isinstance(filter_type, str) else "ALL"
+    filter_upper = filter_str.strip().upper()
+    lim = int(limit) if isinstance(limit, (int, float)) else 20
+    is_force = bool(force_refresh) if isinstance(force_refresh, bool) else False
+
+    payload = AsymmetricEngine.scan_sp500_asymmetric(
+        top_n=lim,
+        force_refresh=is_force,
+    )
+    res = dict(payload)
+    if filter_upper == "CALL":
+        res["asymmetric_longs"] = [s for s in payload.get("asymmetric_longs", []) if s.get("option_type") == "CALL"]
+        res["leaps_pmcc"] = []
+    elif filter_upper == "PUT":
+        res["asymmetric_longs"] = [s for s in payload.get("asymmetric_longs", []) if s.get("option_type") == "PUT"]
+        res["leaps_pmcc"] = []
+    elif filter_upper in ["PMCC", "LEAPS"]:
+        res["asymmetric_longs"] = []
+        res["leaps_pmcc"] = payload.get("leaps_pmcc", [])
+
+    res["total_asymmetric_longs"] = len(res.get("asymmetric_longs", []))
+    res["total_leaps_pmcc"] = len(res.get("leaps_pmcc", []))
+    return res
+
+
 @app.get("/api/asymmetric/setups")
 def get_asymmetric_setups(
-    symbols: str = Query("SPY,QQQ,AAPL,NVDA,TSLA,AMD,META,MSFT", description="Comma-separated tickers")
+    symbols: str = Query("SP500", description="Comma-separated tickers or 'SP500' for qualified screener"),
+    universe: str = Query("sp500", description="Universe: sp500 or custom")
 ):
     """
     Scans for high-convexity opportunities:
-    1. 45 DTE Asymmetric Long Calls/Puts (Home-Run Hunter targeting 200%-800% gains)
-    2. Deep ITM LEAPS (365+ DTE) & Poor Man's Covered Call (PMCC) setups
+    Defaults to S&P 500 Qualified Scanner where only quantitatively justified setups are returned.
     """
-    cache_key = f"asymmetric:{symbols}"
+    sym_str = symbols if isinstance(symbols, str) else "SP500"
+    univ_str = universe if isinstance(universe, str) else "sp500"
+    cleaned_symbols = sym_str.strip().upper() if sym_str else "SP500"
+    if cleaned_symbols in ["SP500", "S&P500", "ALL", ""] or univ_str.lower() == "sp500":
+        return get_sp500_asymmetric_setups(filter_type="ALL", limit=20, force_refresh=False)
+
+    cache_key = f"asymmetric:{cleaned_symbols}"
     cached = get_from_cache(cache_key)
     if cached:
         return cached
 
-    sym_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
-    long_setups = []
-    pmcc_setups = []
-
-    for sym in sym_list:
-        try:
-            spot, chain_df = LiveDataFeed.get_options_chain_for_dte_range(sym, min_dte=20, max_dte=500)
-            if spot <= 0 or chain_df.empty:
-                continue
-
-            # Indicators & Context
-            iv_rank = 18.0
-            net_gex = 0.0
-            ema_20 = None
-            ema_50 = None
-            rsi = None
-
-            try:
-                sig = SignalGenerator.analyze_ticker(sym)
-                if sig and sig.overview:
-                    iv_rank = sig.overview.iv_rank_1y
-                    spot = sig.overview.spot_price
-                if sig and sig.gamma_profile:
-                    net_gex = sig.gamma_profile.net_gex_dollar_1pct
-
-                tech = calculate_technical_indicators(sym, spot)
-                ema_20 = tech["ema_20"]
-                ema_50 = tech["ema_50"]
-                rsi = tech["rsi"]
-            except Exception:
-                pass
-
-            # 1. Scan 45 DTE Asymmetric Longs
-            longs = AsymmetricEngine.scan_asymmetric_longs(
-                symbol=sym,
-                spot_price=spot,
-                chain_df=chain_df,
-                iv_rank=iv_rank,
-                net_gex=net_gex,
-                ema_20=ema_20,
-                ema_50=ema_50,
-                rsi=rsi,
-            )
-            for l in longs:
-                long_setups.append({
-                    "symbol": l.symbol,
-                    "option_type": l.option_type,
-                    "strategy_type": l.strategy_type,
-                    "expiration": l.expiration,
-                    "dte": l.dte,
-                    "spot_price": l.spot_price,
-                    "strike": l.strike,
-                    "delta": l.delta,
-                    "gamma": l.gamma,
-                    "vega": l.vega,
-                    "theta_daily": l.theta_daily,
-                    "entry_price": l.entry_price,
-                    "max_risk_dollar": l.max_risk_dollar,
-                    "breakeven_price": l.breakeven_price,
-                    "target_1_price": l.target_1_price,
-                    "target_2_price": l.target_2_price,
-                    "target_3_price": l.target_3_price,
-                    "stop_loss_price": l.stop_loss_price,
-                    "iv_rank": l.iv_rank,
-                    "catalyst_reason": l.catalyst_reason,
-                    "exit_rules": l.exit_rules,
-                    "flow_squeeze_alert": getattr(l, 'flow_squeeze_alert', False),
-                    "target_profit_potential": getattr(l, 'target_profit_potential', "300% - 800% ROI"),
-                    "strategy_score": getattr(l, 'strategy_score', 85.0),
-                    "vol_oi_ratio": getattr(l, 'vol_oi_ratio', 1.0),
-                    "unusual_flow_type": getattr(l, 'unusual_flow_type', None),
-                })
-
-            # 2. Scan LEAPS & PMCC
-            pmcc = AsymmetricEngine.scan_leaps_pmcc(
-                symbol=sym,
-                spot_price=spot,
-                chain_df=chain_df,
-            )
-            if pmcc:
-                pmcc_setups.append({
-                    "symbol": pmcc.symbol,
-                    "spot_price": pmcc.spot_price,
-                    "leaps_expiration": pmcc.leaps_expiration,
-                    "leaps_dte": pmcc.leaps_dte,
-                    "leaps_strike": pmcc.leaps_strike,
-                    "leaps_delta": pmcc.leaps_delta,
-                    "leaps_entry_price": pmcc.leaps_entry_price,
-                    "short_expiration": pmcc.short_expiration,
-                    "short_dte": pmcc.short_dte,
-                    "short_strike": pmcc.short_strike,
-                    "short_delta": pmcc.short_delta,
-                    "short_entry_price": pmcc.short_entry_price,
-                    "net_debit_dollar": pmcc.net_debit_dollar,
-                    "effective_leverage": pmcc.effective_leverage,
-                    "monthly_yield_pct": pmcc.monthly_yield_pct,
-                    "annualized_yield_pct": pmcc.annualized_yield_pct,
-                    "max_risk_dollar": pmcc.max_risk_dollar,
-                    "breakeven_price": pmcc.breakeven_price,
-                    "reasoning": pmcc.reasoning,
-                    "exit_rules": pmcc.exit_rules,
-                })
-        except Exception as e:
-            continue
-
-    res = {
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "total_asymmetric_longs": len(long_setups),
-        "total_leaps_pmcc": len(pmcc_setups),
-        "asymmetric_longs": long_setups,
-        "leaps_pmcc": pmcc_setups,
-    }
+    sym_list = [s.strip().upper() for s in cleaned_symbols.split(",") if s.strip()]
+    res = AsymmetricEngine.scan_sp500_asymmetric(top_n=20, symbols_subset=sym_list, force_refresh=True)
     set_in_cache(cache_key, res, ttl_seconds=60)
     return res
 
